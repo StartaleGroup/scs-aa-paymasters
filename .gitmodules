@@ -1,9 +1,3 @@
 [submodule "scs-paymasters/lib/forge-std"]
 	path = scs-paymasters/lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
-[submodule "lib/account-abstraction-v7"]
-	path = lib/account-abstraction-v7
-	url = https://github.com/eth-infinitism/account-abstraction
-[submodule "lib/account-abstraction-v6"]
-	path = lib/account-abstraction-v6
-	url = https://github.com/eth-infinitism/account-abstraction
