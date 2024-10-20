@@ -4,3 +4,6 @@
 [submodule "lib/account-abstraction/v0_7"]
 	path = lib/account-abstraction/v0_7
 	url = https://github.com/eth-infinitism/account-abstraction
+[submodule "lib/account-abstraction/v0_6"]
+	path = lib/account-abstraction/v0_6
+	url = https://github.com/eth-infinitism/account-abstraction
