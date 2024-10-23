@@ -31,6 +31,36 @@ contract VerifyingPaymaster is BasePaymaster, MultiSigners {
     {}
 
     /**
+     * return the hash we're going to sign off-chain (and validate on-chain)
+     * this method is called by the off-chain service, to sign the request.
+     * it is called on-chain from the validatePaymasterUserOp, to validate the signature.
+     * note that this signature covers all fields of the UserOperation, except the "paymasterAndData",
+     * which will carry the signature itself.
+     */
+    function getHash(PackedUserOperation calldata userOp, uint48 validUntil, uint48 validAfter)
+        public
+        view
+        returns (bytes32)
+    {
+        return keccak256(
+            abi.encode(
+                userOp.getSender(),
+                userOp.nonce,
+                keccak256(userOp.initCode),
+                keccak256(userOp.callData),
+                userOp.accountGasLimits,
+                uint256(bytes32(userOp.paymasterAndData[PAYMASTER_VALIDATION_GAS_OFFSET:PAYMASTER_DATA_OFFSET])),
+                userOp.preVerificationGas,
+                userOp.gasFees,
+                block.chainid,
+                address(this),
+                validUntil,
+                validAfter
+            )
+        );
+    }
+
+    /**
      * @notice Internal helper to parse and validate the userOperation's paymasterAndData.
      * @param _userOp The userOperation.
      * @param _userOpHash The userOperation hash.
@@ -39,8 +69,10 @@ contract VerifyingPaymaster is BasePaymaster, MultiSigners {
      * verify our external signer signed this request.
      * the "paymasterAndData" is expected to be the paymaster and a signature over the entire request params
      * paymasterAndData[:20] : address(this)
-     * paymasterAndData[20:84] : abi.encode(validUntil, validAfter)
-     * paymasterAndData[84:] : signature
+     * paymasterAndData[20:36] : paymaster validation gas
+     * paymasterAndData[36:52] : paymaster post-op gas
+     * paymasterAndData[52:116] : abi.encode(validUntil, validAfter)
+     * paymasterAndData[116:] : signature
      */
     function _validatePaymasterUserOp(PackedUserOperation calldata _userOp, bytes32 _userOpHash, uint256 /* maxCost */ )
         internal
@@ -72,39 +104,5 @@ contract VerifyingPaymaster is BasePaymaster, MultiSigners {
     {
         (validUntil, validAfter) = abi.decode(_paymasterAndData[VALID_TIMESTAMP_OFFSET:], (uint48, uint48));
         signature = _paymasterAndData[SIGNATURE_OFFSET:];
-    }
-
-    /**
-     * return the hash we're going to sign off-chain (and validate on-chain)
-     * this method is called by the off-chain service, to sign the request.
-     * it is called on-chain from the validatePaymasterUserOp, to validate the signature.
-     * note that this signature covers all fields of the UserOperation, except the "paymasterAndData",
-     * which will carry the signature itself.
-     */
-    function getHash(PackedUserOperation calldata userOp, uint48 validUntil, uint48 validAfter)
-        public
-        view
-        returns (bytes32)
-    {
-        // can't use userOp.hash(), since it contains also the paymasterAndData itself.
-        address sender = userOp.getSender();
-        return
-        // TODO: Decide what to hash.
-        keccak256(
-            abi.encode(
-                sender,
-                userOp.nonce,
-                keccak256(userOp.initCode),
-                keccak256(userOp.callData),
-                userOp.accountGasLimits,
-                uint256(bytes32(userOp.paymasterAndData[PAYMASTER_VALIDATION_GAS_OFFSET:PAYMASTER_DATA_OFFSET])),
-                userOp.preVerificationGas,
-                userOp.gasFees,
-                block.chainid,
-                address(this),
-                validUntil,
-                validAfter
-            )
-        );
     }
 }

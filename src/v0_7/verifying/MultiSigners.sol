@@ -25,7 +25,7 @@ abstract contract MultiSigners is Ownable {
     }
 
     function removeSigner(address _signer) public onlyOwner {
-        signers[_signer] = false;
+        delete signers[_signer];
         emit SignerRemoved(_signer);
     }
 
