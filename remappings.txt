@@ -1,0 +1,9 @@
+forge-std/=lib/forge-std/src/
+@account-abstraction/v0_6/=lib/account-abstraction/v0_6/
+@account-abstraction/v0_7/=lib/account-abstraction/v0_7/
+@openzeppelin/=lib/openzeppelin-contracts/
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+account-abstraction/=lib/account-abstraction/
+erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/
+halmos-cheatcodes/=lib/openzeppelin-contracts/lib/halmos-cheatcodes/src/
+openzeppelin-contracts/=lib/openzeppelin-contracts/
