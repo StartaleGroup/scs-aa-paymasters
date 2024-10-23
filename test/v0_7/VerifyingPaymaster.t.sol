@@ -11,9 +11,7 @@ contract VerifyingPaymasterTest is Test {
         // verifyingPaymaster = new VerifyingPaymaster();
     }
 
-    function test_Increment() public {
-    }
+    function test_Increment() public {}
 
-    function testFuzz_SetNumber(uint256 x) public {
-    }
+    function testFuzz_SetNumber(uint256 x) public {}
 }
