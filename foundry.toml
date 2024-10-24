@@ -7,14 +7,4 @@ optimizer = true
 optimizer_runs = 1000000
 ast = true
 
-remappings = [
-    "forge-std/=lib/forge-std/src/",
-    "@account-abstraction/v0_6/=lib/account-abstraction/v0_6/",
-    "@account-abstraction/v0_7/=lib/account-abstraction/v0_7/",
-    "@openzeppelin/=lib/openzeppelin-contracts/"
-]
-
-[default.optimizer_details]
-yul = false
-
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
