@@ -13,7 +13,10 @@ contract VerifyingPaymaster is BasePaymaster, MultiSigners {
     using UserOperationLib for PackedUserOperation;
 
     uint256 private constant VALID_TIMESTAMP_OFFSET = PAYMASTER_DATA_OFFSET;
-    uint256 private constant SIGNATURE_OFFSET = VALID_TIMESTAMP_OFFSET + 64;
+
+    uint256 private constant TIMESTAMP_DATA_LENGTH = 6;
+
+    uint256 private constant SIGNATURE_OFFSET = VALID_TIMESTAMP_OFFSET + TIMESTAMP_DATA_LENGTH * 2;
 
     /// @notice The paymaster signature length is invalid.
     error PaymasterSignatureLengthInvalid();
@@ -25,8 +28,8 @@ contract VerifyingPaymaster is BasePaymaster, MultiSigners {
         address indexed user
     );
 
-    constructor(IEntryPoint _entryPoint, address _owner, address[] memory _verifyingSigners)
-        BasePaymaster(_entryPoint)
+    constructor(address _entryPoint, address[] memory _verifyingSigners)
+        BasePaymaster(IEntryPoint(_entryPoint))
         MultiSigners(_verifyingSigners)
     {}
 
@@ -37,11 +40,7 @@ contract VerifyingPaymaster is BasePaymaster, MultiSigners {
      * note that this signature covers all fields of the UserOperation, except the "paymasterAndData",
      * which will carry the signature itself.
      */
-    function getHash(PackedUserOperation calldata userOp, uint48 validUntil, uint48 validAfter)
-        public
-        view
-        returns (bytes32)
-    {
+    function getHash(PackedUserOperation calldata userOp) public view returns (bytes32) {
         return keccak256(
             abi.encode(
                 userOp.getSender(),
@@ -49,13 +48,12 @@ contract VerifyingPaymaster is BasePaymaster, MultiSigners {
                 keccak256(userOp.initCode),
                 keccak256(userOp.callData),
                 userOp.accountGasLimits,
-                uint256(bytes32(userOp.paymasterAndData[PAYMASTER_VALIDATION_GAS_OFFSET:PAYMASTER_DATA_OFFSET])),
                 userOp.preVerificationGas,
                 userOp.gasFees,
                 block.chainid,
                 address(this),
-                validUntil,
-                validAfter
+                // hashing over all paymaster fields besides signature
+                keccak256(userOp.paymasterAndData[:SIGNATURE_OFFSET])
             )
         );
     }
@@ -86,7 +84,7 @@ contract VerifyingPaymaster is BasePaymaster, MultiSigners {
             revert PaymasterSignatureLengthInvalid();
         }
 
-        bytes32 hash = MessageHashUtils.toEthSignedMessageHash(getHash(_userOp, validUntil, validAfter));
+        bytes32 hash = MessageHashUtils.toEthSignedMessageHash(getHash(_userOp));
         address recoveredSigner = ECDSA.recover(hash, signature);
 
         // Don't revert even if signature is invalid.
@@ -98,11 +96,13 @@ contract VerifyingPaymaster is BasePaymaster, MultiSigners {
     }
 
     function _parsePaymasterAndData(bytes calldata _paymasterAndData)
-        public
+        internal
         pure
         returns (uint48 validUntil, uint48 validAfter, bytes calldata signature)
     {
-        (validUntil, validAfter) = abi.decode(_paymasterAndData[VALID_TIMESTAMP_OFFSET:], (uint48, uint48));
+        validUntil =
+            uint48(bytes6(_paymasterAndData[VALID_TIMESTAMP_OFFSET:VALID_TIMESTAMP_OFFSET + TIMESTAMP_DATA_LENGTH]));
+        validAfter = uint48(bytes6(_paymasterAndData[VALID_TIMESTAMP_OFFSET + TIMESTAMP_DATA_LENGTH:SIGNATURE_OFFSET]));
         signature = _paymasterAndData[SIGNATURE_OFFSET:];
     }
 }
