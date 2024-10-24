@@ -69,8 +69,8 @@ contract VerifyingPaymaster is BasePaymaster, MultiSigners {
      * paymasterAndData[:20] : address(this)
      * paymasterAndData[20:36] : paymaster validation gas
      * paymasterAndData[36:52] : paymaster post-op gas
-     * paymasterAndData[52:116] : abi.encode(validUntil, validAfter)
-     * paymasterAndData[116:] : signature
+     * paymasterAndData[52:64] : abi.packedEncode(validUntil, validAfter) - uint48 (6bytes length) for each
+     * paymasterAndData[64:] : signature
      */
     function _validatePaymasterUserOp(PackedUserOperation calldata _userOp, bytes32 _userOpHash, uint256 /* maxCost */ )
         internal
