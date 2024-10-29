@@ -6,7 +6,7 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {IEntryPoint} from "@account-abstraction/v0_7/contracts/interfaces/IEntryPoint.sol";
 
 /**
- * Helper class for creating a contract with multiple valid signers for verifying paymaster data.
+ * Helper class for creating a contract with multiple valid signers for sponsorship paymaster data.
  */
 abstract contract MultiSigners is Ownable {
     /// @notice Emitted when a signer is added.
