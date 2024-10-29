@@ -9,7 +9,7 @@ import {_packValidationData} from "@account-abstraction/v0_7/contracts/core/Help
 import {IEntryPoint} from "@account-abstraction/v0_7/contracts/interfaces/IEntryPoint.sol";
 import {MultiSigners} from "./MultiSigners.sol";
 
-contract VerifyingPaymaster is BasePaymaster, MultiSigners {
+contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
     using UserOperationLib for PackedUserOperation;
 
     uint256 private constant VALID_TIMESTAMP_OFFSET = PAYMASTER_DATA_OFFSET;
@@ -28,9 +28,9 @@ contract VerifyingPaymaster is BasePaymaster, MultiSigners {
         address indexed user
     );
 
-    constructor(address _entryPoint, address[] memory _verifyingSigners)
+    constructor(address _entryPoint, address[] memory _signers)
         BasePaymaster(IEntryPoint(_entryPoint))
-        MultiSigners(_verifyingSigners)
+        MultiSigners(_signers)
     {}
 
     /**

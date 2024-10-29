@@ -8,7 +8,7 @@ import {
 import {PackedUserOperation} from "@account-abstraction/v0_7/contracts/interfaces/PackedUserOperation.sol";
 import {EntryPoint} from "@account-abstraction/v0_7/contracts/core/EntryPoint.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {VerifyingPaymaster} from "../../src/v0_7/verifying/VerifyingPaymaster.sol";
+import {SponsorshipPaymaster} from "../../src/v0_7/sponsorship/SponsorshipPaymaster.sol";
 import {TestCounter} from "../TestCounter.sol";
 
 struct PaymasterData {
@@ -19,8 +19,8 @@ struct PaymasterData {
     uint48 validAfter;
 }
 
-contract VerifyingPaymasterTest is Test {
-    VerifyingPaymaster paymaster;
+contract SponsorshipPaymasterTest is Test {
+    SponsorshipPaymaster paymaster;
     SimpleAccountFactory accountFactory;
     SimpleAccount account;
     EntryPoint entryPoint;
@@ -49,7 +49,7 @@ contract VerifyingPaymasterTest is Test {
 
         // Set paymasterOwner as the msg.sender of next call, ensuring owner of Paymaster is set to paymasterOwner.
         vm.prank(paymasterOwner);
-        paymaster = new VerifyingPaymaster(address(entryPoint), new address[](0));
+        paymaster = new SponsorshipPaymaster(address(entryPoint), new address[](0));
         paymaster.deposit{value: 10000e18}();
 
         vm.prank(paymasterOwner);
@@ -58,7 +58,7 @@ contract VerifyingPaymasterTest is Test {
 
     function testDeployment() external {
         vm.prank(paymasterOwner);
-        VerifyingPaymaster deployedPaymaster = new VerifyingPaymaster(address(entryPoint), new address[](0));
+        SponsorshipPaymaster deployedPaymaster = new SponsorshipPaymaster(address(entryPoint), new address[](0));
         vm.prank(paymasterOwner);
         deployedPaymaster.addSigner(paymasterSigner);
 
@@ -66,7 +66,7 @@ contract VerifyingPaymasterTest is Test {
         assertTrue(deployedPaymaster.signers(paymasterSigner));
     }
 
-    function testVerifyingSuccess() external {
+    function testSponsorshipSuccess() external {
         address sender = address(account);
         bytes memory callData = abi.encodeWithSelector(
             SimpleAccount.execute.selector, address(counter), 0, abi.encodeWithSelector(TestCounter.count.selector)
