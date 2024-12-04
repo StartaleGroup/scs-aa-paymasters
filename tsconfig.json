@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "outDir": "./integration/dist",
+    "rootDir": "./integration"
+  },
+  "include": ["integration/**/*"],
+  "exclude": ["node_modules"]
+}
