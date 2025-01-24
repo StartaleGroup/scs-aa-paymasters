@@ -1,66 +1,51 @@
-## Foundry
+# SCS AA Paymasters
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+## Overview
 
-Foundry consists of:
+AA Paymasters smart contract repository.
+Utilizing Foundary `forge` for contracts development.
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+## Pre Requisites
 
-## Documentation
+### Git Submodules\*\*
 
-https://book.getfoundry.sh/
+```
+git clone git@github.com:StartaleLabs/scs-aa-paymasters.git
+cd scs-aa-paymasters
+git submodule update --init --recursive
+```
 
-## Usage
+※ You may need to execute `git submodule update --init --recursive` twice for Rundler compilation. This is because of submodules of our submodule Rundler.
+
+### Foundry
+
+Utilizing `forge` a part of Foundry's tool heavilly in this project.
+
+Doc: https://book.getfoundry.sh/
+Installation: https://book.getfoundry.sh/getting-started/installation
+
+```
+curl -L https://foundry.paradigm.xyz | bash
+```
+
+## Develop
+
+Repository is structured based on Foundry's project layout.
+See more details here: https://book.getfoundry.sh/projects/project-layout.
+
+`src`: Solidity smart contracts
+`scripts`: Utility scripts for various purposes written in Solidity
+`test`: Unit tests for smart contracts in `src` folder, written in Solidity
+`lib`: Dependency libraries for our smart contracts, managed by git submodules
 
 ### Build
 
-```shell
-$ forge build
+```
+forge build
 ```
 
-### Test
+### Test (Unit tests)
 
-```shell
-$ forge test
 ```
-
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
+forge test
 ```
