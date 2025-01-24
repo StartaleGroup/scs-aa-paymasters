@@ -8,8 +8,8 @@ import {
 import {PackedUserOperation} from "@account-abstraction/v0_7/contracts/interfaces/PackedUserOperation.sol";
 import {EntryPoint} from "@account-abstraction/v0_7/contracts/core/EntryPoint.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {SponsorshipPaymaster} from "../../src/v0_7/sponsorship/SponsorshipPaymaster.sol";
-import {TestCounter} from "../TestCounter.sol";
+import {SponsorshipPaymaster} from "../src/sponsorship/SponsorshipPaymaster.sol";
+import {TestCounter} from "./TestCounter.sol";
 
 struct PaymasterData {
     address paymasterAddress;
