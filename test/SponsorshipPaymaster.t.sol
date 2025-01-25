@@ -15,8 +15,10 @@ struct PaymasterData {
     address paymasterAddress;
     uint128 preVerificationGas;
     uint128 postOpGas;
+    address fundingId;
     uint48 validUntil;
     uint48 validAfter;
+    uint32 dynamicAdjustment;
 }
 
 contract SponsorshipPaymasterTest is Test {
@@ -33,6 +35,7 @@ contract SponsorshipPaymasterTest is Test {
     uint256 unauthorizedSignerKey;
     address user;
     uint256 userKey;
+    address fundingID;
 
     function setUp() external {
         counter = new TestCounter();
@@ -42,6 +45,8 @@ contract SponsorshipPaymasterTest is Test {
         (paymasterSigner, paymasterSignerKey) = makeAddrAndKey("paymasterSigner");
         (, unauthorizedSignerKey) = makeAddrAndKey("unauthorizedSigner");
         (user, userKey) = makeAddrAndKey("user");
+
+        fundingID = makeAddr("fundingID");
 
         entryPoint = new EntryPoint();
         accountFactory = new SimpleAccountFactory(entryPoint);
@@ -100,22 +105,28 @@ contract SponsorshipPaymasterTest is Test {
             paymasterAddress: address(paymaster),
             preVerificationGas: 100_000,
             postOpGas: 50_000,
+            fundingId: fundingID,
             validUntil: 0, // 0 means no time limit
-            validAfter: 0
+            validAfter: 0,
+            dynamicAdjustment: 0
         });
 
         userOp.paymasterAndData = abi.encodePacked(
-            data.paymasterAddress, data.preVerificationGas, data.postOpGas, data.validUntil, data.validAfter
+            data.paymasterAddress,
+            data.preVerificationGas,
+            data.postOpGas,
+            data.fundingId,
+            data.validUntil,
+            data.validAfter,
+            data.dynamicAdjustment
         );
 
         // Calling paymaster contract public function to get hash.
-        bytes32 hash = paymaster.getHash(userOp);
+        bytes32 hash = paymaster.getHash(userOp, data.fundingId, 0, 0, 0);
         bytes memory sig = getSignature(hash, paymasterSignerKey);
 
         // Just added sig to the end of paymasterAndData.
-        return abi.encodePacked(
-            data.paymasterAddress, data.preVerificationGas, data.postOpGas, data.validUntil, data.validAfter, sig
-        );
+        return abi.encodePacked(userOp.paymasterAndData, sig);
     }
 
     function getSignature(bytes32 hash, uint256 signingKey) private pure returns (bytes memory) {

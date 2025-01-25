@@ -7,7 +7,7 @@ Utilizing Foundary `forge` for contracts development.
 
 ## Pre Requisites
 
-### Git Submodules\*\*
+### Git Submodules
 
 ```
 git clone git@github.com:StartaleLabs/scs-aa-paymasters.git
