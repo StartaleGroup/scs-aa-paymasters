@@ -58,21 +58,20 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         uint32 dynamicAdjustment
     ) public view returns (bytes32) {
         return keccak256(
-            abi.encode(
-                userOp.getSender(),
-                userOp.nonce,
-                keccak256(userOp.initCode),
-                keccak256(userOp.callData),
-                userOp.accountGasLimits,
-                uint256(bytes32(userOp.paymasterAndData[PAYMASTER_VALIDATION_GAS_OFFSET:PAYMASTER_DATA_OFFSET])),
-                userOp.preVerificationGas,
-                userOp.gasFees,
-                block.chainid,
-                address(this),
-                fundingId,
-                validUntil,
-                validAfter,
-                dynamicAdjustment
+            bytes.concat(
+                abi.encode(
+                    userOp.getSender(),
+                    userOp.nonce,
+                    keccak256(userOp.initCode),
+                    keccak256(userOp.callData),
+                    userOp.accountGasLimits,
+                    uint256(bytes32(userOp.paymasterAndData[PAYMASTER_VALIDATION_GAS_OFFSET:PAYMASTER_DATA_OFFSET])),
+                    userOp.preVerificationGas,
+                    userOp.gasFees,
+                    block.chainid,
+                    address(this)
+                ),
+                abi.encode(fundingId, validUntil, validAfter, dynamicAdjustment)
             )
         );
     }

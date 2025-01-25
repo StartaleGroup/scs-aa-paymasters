@@ -122,7 +122,8 @@ contract SponsorshipPaymasterTest is Test {
         );
 
         // Calling paymaster contract public function to get hash.
-        bytes32 hash = paymaster.getHash(userOp, data.fundingId, 0, 0, 0);
+        bytes32 hash =
+            paymaster.getHash(userOp, data.fundingId, data.validUntil, data.validAfter, data.dynamicAdjustment);
         bytes memory sig = getSignature(hash, paymasterSignerKey);
 
         // Just added sig to the end of paymasterAndData.
