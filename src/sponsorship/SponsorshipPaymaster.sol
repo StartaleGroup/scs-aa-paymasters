@@ -12,11 +12,21 @@ import {MultiSigners} from "./MultiSigners.sol";
 contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
     using UserOperationLib for PackedUserOperation;
 
-    uint256 private constant VALID_TIMESTAMP_OFFSET = PAYMASTER_DATA_OFFSET;
+    uint256 private constant FUNDING_ID_OFFSET = PAYMASTER_DATA_OFFSET;
+
+    uint256 private constant FUNDING_ID_LENGTH = 20;
+
+    uint256 private constant VALID_UNTIL_TIMESTAMP_OFFSET = FUNDING_ID_OFFSET + FUNDING_ID_LENGTH;
 
     uint256 private constant TIMESTAMP_DATA_LENGTH = 6;
 
-    uint256 private constant SIGNATURE_OFFSET = VALID_TIMESTAMP_OFFSET + TIMESTAMP_DATA_LENGTH * 2;
+    uint256 private constant VALID_AFTER_TIMESTAMP_OFFSET = VALID_UNTIL_TIMESTAMP_OFFSET + TIMESTAMP_DATA_LENGTH;
+
+    uint256 private constant DYNAMIC_ADJUSTMENT_OFFSET = VALID_AFTER_TIMESTAMP_OFFSET + TIMESTAMP_DATA_LENGTH;
+
+    uint256 private constant DYNAMIC_ADJUSTMENT_LENGTH = 4;
+
+    uint256 private constant SIGNATURE_OFFSET = DYNAMIC_ADJUSTMENT_OFFSET + DYNAMIC_ADJUSTMENT_LENGTH;
 
     /// @notice The paymaster signature length is invalid.
     error PaymasterSignatureLengthInvalid();
@@ -48,12 +58,12 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
                 keccak256(userOp.initCode),
                 keccak256(userOp.callData),
                 userOp.accountGasLimits,
+                uint256(bytes32(userOp.paymasterAndData[PAYMASTER_VALIDATION_GAS_OFFSET:PAYMASTER_DATA_OFFSET])),
                 userOp.preVerificationGas,
                 userOp.gasFees,
                 block.chainid,
                 address(this),
-                // hashing over all paymaster fields besides signature
-                keccak256(userOp.paymasterAndData[:SIGNATURE_OFFSET])
+                userOp.paymasterAndData[PAYMASTER_DATA_OFFSET:SIGNATURE_OFFSET]
             )
         );
     }
@@ -69,16 +79,18 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
      * paymasterAndData[:20] : address(this)
      * paymasterAndData[20:36] : paymaster validation gas
      * paymasterAndData[36:52] : paymaster post-op gas
-     * paymasterAndData[52:64] : abi.packedEncode(validUntil, validAfter) - uint48 (6bytes length) for each
-     * paymasterAndData[64:] : signature
+     * paymasterAndData[52:72] : fundingId
+     * paymasterAndData[72:84] : abi.packedEncode(validUntil, validAfter) - uint48 (6bytes length) for each
+     * paymasterAndData[84:88] : dynamicAdjustment
+     * paymasterAndData[88:] : signature
      */
     function _validatePaymasterUserOp(PackedUserOperation calldata _userOp, bytes32 _userOpHash, uint256 /* maxCost */ )
         internal
         override
         returns (bytes memory, uint256)
     {
-        (uint48 validUntil, uint48 validAfter, bytes calldata signature) =
-            _parsePaymasterAndData(_userOp.paymasterAndData);
+        (address _fundingId, uint48 validUntil, uint48 validAfter, uint32 _dynamicAdjustment, bytes calldata signature)
+        = _parsePaymasterAndData(_userOp.paymasterAndData);
         // ECDSA library supports both 64 and 65-byte long signatures.
         if (signature.length != 64 && signature.length != 65) {
             revert PaymasterSignatureLengthInvalid();
@@ -98,11 +110,18 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
     function _parsePaymasterAndData(bytes calldata _paymasterAndData)
         internal
         pure
-        returns (uint48 validUntil, uint48 validAfter, bytes calldata signature)
+        returns (
+            address fundingId,
+            uint48 validUntil,
+            uint48 validAfter,
+            uint32 dynamicAdjustment,
+            bytes calldata signature
+        )
     {
-        validUntil =
-            uint48(bytes6(_paymasterAndData[VALID_TIMESTAMP_OFFSET:VALID_TIMESTAMP_OFFSET + TIMESTAMP_DATA_LENGTH]));
-        validAfter = uint48(bytes6(_paymasterAndData[VALID_TIMESTAMP_OFFSET + TIMESTAMP_DATA_LENGTH:SIGNATURE_OFFSET]));
+        fundingId = address(bytes20(_paymasterAndData[FUNDING_ID_OFFSET:VALID_UNTIL_TIMESTAMP_OFFSET]));
+        validUntil = uint48(bytes6(_paymasterAndData[VALID_UNTIL_TIMESTAMP_OFFSET:VALID_AFTER_TIMESTAMP_OFFSET]));
+        validAfter = uint48(bytes6(_paymasterAndData[VALID_AFTER_TIMESTAMP_OFFSET:DYNAMIC_ADJUSTMENT_OFFSET]));
+        dynamicAdjustment = uint32(bytes4(_paymasterAndData[DYNAMIC_ADJUSTMENT_OFFSET:SIGNATURE_OFFSET]));
         signature = _paymasterAndData[SIGNATURE_OFFSET:];
     }
 }
