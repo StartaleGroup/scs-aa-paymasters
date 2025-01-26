@@ -50,28 +50,20 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
      * note that this signature covers all fields of the UserOperation, except the "paymasterAndData",
      * which will carry the signature itself.
      */
-    function getHash(
-        PackedUserOperation calldata userOp,
-        address fundingId,
-        uint48 validUntil,
-        uint48 validAfter,
-        uint32 dynamicAdjustment
-    ) public view returns (bytes32) {
+    function getHash(PackedUserOperation calldata userOp) public view returns (bytes32) {
         return keccak256(
-            bytes.concat(
-                abi.encode(
-                    userOp.getSender(),
-                    userOp.nonce,
-                    keccak256(userOp.initCode),
-                    keccak256(userOp.callData),
-                    userOp.accountGasLimits,
-                    uint256(bytes32(userOp.paymasterAndData[PAYMASTER_VALIDATION_GAS_OFFSET:PAYMASTER_DATA_OFFSET])),
-                    userOp.preVerificationGas,
-                    userOp.gasFees,
-                    block.chainid,
-                    address(this)
-                ),
-                abi.encode(fundingId, validUntil, validAfter, dynamicAdjustment)
+            abi.encode(
+                userOp.getSender(),
+                userOp.nonce,
+                keccak256(userOp.initCode),
+                keccak256(userOp.callData),
+                userOp.accountGasLimits,
+                uint256(bytes32(userOp.paymasterAndData[PAYMASTER_VALIDATION_GAS_OFFSET:PAYMASTER_DATA_OFFSET])),
+                userOp.preVerificationGas,
+                userOp.gasFees,
+                block.chainid,
+                address(this),
+                userOp.paymasterAndData[PAYMASTER_DATA_OFFSET:SIGNATURE_OFFSET]
             )
         );
     }
@@ -97,16 +89,14 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         override
         returns (bytes memory, uint256)
     {
-        (address fundingId, uint48 validUntil, uint48 validAfter, uint32 dynamicAdjustment, bytes calldata signature) =
-            _parsePaymasterAndData(_userOp.paymasterAndData);
+        (address _fundingId, uint48 validUntil, uint48 validAfter, uint32 _dynamicAdjustment, bytes calldata signature)
+        = _parsePaymasterAndData(_userOp.paymasterAndData);
         // ECDSA library supports both 64 and 65-byte long signatures.
         if (signature.length != 64 && signature.length != 65) {
             revert PaymasterSignatureLengthInvalid();
         }
 
-        bytes32 hash = MessageHashUtils.toEthSignedMessageHash(
-            getHash(_userOp, fundingId, validUntil, validAfter, dynamicAdjustment)
-        );
+        bytes32 hash = MessageHashUtils.toEthSignedMessageHash(getHash(_userOp));
         address recoveredSigner = ECDSA.recover(hash, signature);
 
         // Don't revert even if signature is invalid.
