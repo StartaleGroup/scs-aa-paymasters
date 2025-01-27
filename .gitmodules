@@ -7,3 +7,6 @@
 [submodule "lib/account-abstraction"]
 	path = lib/account-abstraction
 	url = git@github.com:eth-infinitism/account-abstraction.git
+[submodule "@rundler"]
+	path = @rundler
+	url = git@github.com:alchemyplatform/rundler.git
