@@ -90,7 +90,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         returns (bytes memory, uint256)
     {
         (address _fundingId, uint48 validUntil, uint48 validAfter, uint32 _dynamicAdjustment, bytes calldata signature)
-        = _parsePaymasterAndData(_userOp.paymasterAndData);
+        = parsePaymasterAndData(_userOp.paymasterAndData);
         // ECDSA library supports both 64 and 65-byte long signatures.
         if (signature.length != 64 && signature.length != 65) {
             revert PaymasterSignatureLengthInvalid();
@@ -107,8 +107,8 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         return ("", validationData);
     }
 
-    function _parsePaymasterAndData(bytes calldata _paymasterAndData)
-        internal
+    function parsePaymasterAndData(bytes calldata _paymasterAndData)
+        public
         pure
         returns (
             address fundingId,

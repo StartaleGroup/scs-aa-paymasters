@@ -76,4 +76,4 @@ src/sponsorship/SponsorshipPaymaster.sol:SponsorshipPaymaster --watch
 
 | Network        | Address                                                                                                                  |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Soneium Minato | `0x626b07d22B348c84232ac7d0ccFF046d4166b3Ff` (salt:`0x90d8084deab30c2a37c45e8d47f49f2f7965183cb6990a98943ef94940681de3`) |
+| Soneium Minato | `0x8E47BF1E8EF8efA64462e94D40E73421e1563DB3` (salt:`0x90d8084deab30c2a37c45e8d47f49f2f7965183cb6990a98943ef94940681de3`) |
