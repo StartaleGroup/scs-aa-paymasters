@@ -49,3 +49,9 @@ forge build
 ```
 forge test
 ```
+
+## Deploy
+
+```
+SALT=$SALT SIGNERS=0xFAD1f284416fA799647e25064D5F75b90e95664e forge script script/SponsorshipPaymaster.s.sol:DeploySponsorshipPaymaster --rpc-url $RPC --broadcast --private-key $PRIV_KEY
+```
