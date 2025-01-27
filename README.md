@@ -34,8 +34,11 @@ Repository is structured based on Foundry's project layout.
 See more details here: https://book.getfoundry.sh/projects/project-layout.
 
 `src`: Solidity smart contracts
+
 `scripts`: Utility scripts for various purposes written in Solidity
+
 `test`: Unit tests for smart contracts in `src` folder, written in Solidity
+
 `lib`: Dependency libraries for our smart contracts, managed by git submodules
 
 ### Build
@@ -56,11 +59,9 @@ Deploy using forge create2
 
 ```
 # deploy
-SALT=$SALT SIGNERS=0xFAD1f284416fA799647e25064D5F75b90e95664e forge script script/SponsorshipPaymaster.s.sol:DeploySponsorshipPaymaster --rpc-url $RPC_URL --broadcast --private-key $PRIV_KEY
+SALT=$SALT SIGNERS=$SIGNERS_COMMA_DELIMITED forge script script/SponsorshipPaymaster.s.sol:DeploySponsorshipPaymaster --rpc-url $RPC_URL --broadcast --private-key $PRIV_KEY
 
 # and verify
-forge verify-contract $ADDRESS SponsorshipPaymaster.s.sol:DeploySponsorshipPaymaster --verifier-url https://soneium-minato.blockscout.com
-
 forge verify-contract \
   --rpc-url $RPC_URL \
   --verifier blockscout \
