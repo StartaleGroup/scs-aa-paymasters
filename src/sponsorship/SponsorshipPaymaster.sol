@@ -3,10 +3,10 @@ pragma solidity ^0.8.28;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {BasePaymaster} from "@account-abstraction/v0_7/contracts/core/BasePaymaster.sol";
-import {UserOperationLib, PackedUserOperation} from "@account-abstraction/v0_7/contracts/core/UserOperationLib.sol";
-import {_packValidationData} from "@account-abstraction/v0_7/contracts/core/Helpers.sol";
-import {IEntryPoint} from "@account-abstraction/v0_7/contracts/interfaces/IEntryPoint.sol";
+import {BasePaymaster} from "@account-abstraction/contracts/core/BasePaymaster.sol";
+import {UserOperationLib, PackedUserOperation} from "@account-abstraction/contracts/core/UserOperationLib.sol";
+import {_packValidationData} from "@account-abstraction/contracts/core/Helpers.sol";
+import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {MultiSigners} from "./MultiSigners.sol";
 
 contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
