@@ -49,3 +49,19 @@ forge build
 ```
 forge test
 ```
+
+## Deploy
+
+Deploy using forge create2
+
+```
+SALT=$SALT SIGNERS=0xFAD1f284416fA799647e25064D5F75b90e95664e forge script script/SponsorshipPaymaster.s.sol:DeploySponsorshipPaymaster --rpc-url $RPC --broadcast --private-key $PRIV_KEY
+```
+
+### Deployed Contract addresses
+
+**Sponsorship Paymaster**
+
+| Network        | Address                                                                                                                  |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Soneium Minato | `0xf69a0740037926B36BC0E81973608Ae16b04B1F7` (salt:`0x90d8084deab30c2a37c45e8d47f49f2f7965183cb6990a98943ef94940681de3`) |
