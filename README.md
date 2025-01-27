@@ -55,7 +55,18 @@ forge test
 Deploy using forge create2
 
 ```
-SALT=$SALT SIGNERS=0xFAD1f284416fA799647e25064D5F75b90e95664e forge script script/SponsorshipPaymaster.s.sol:DeploySponsorshipPaymaster --rpc-url $RPC --broadcast --private-key $PRIV_KEY
+# deploy
+SALT=$SALT SIGNERS=0xFAD1f284416fA799647e25064D5F75b90e95664e forge script script/SponsorshipPaymaster.s.sol:DeploySponsorshipPaymaster --rpc-url $RPC_URL --broadcast --private-key $PRIV_KEY
+
+# and verify
+forge verify-contract $ADDRESS SponsorshipPaymaster.s.sol:DeploySponsorshipPaymaster --verifier-url https://soneium-minato.blockscout.com
+
+forge verify-contract \
+  --rpc-url $RPC_URL \
+  --verifier blockscout \
+  --verifier-url 'https://$BLOCKSCOUT_HOST/api/' \
+  $CONTRACT_ADDRESS \
+src/sponsorship/SponsorshipPaymaster.sol:SponsorshipPaymaster --watch
 ```
 
 ### Deployed Contract addresses
