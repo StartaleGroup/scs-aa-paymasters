@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import {IEntryPoint} from "@account-abstraction/v0_7/contracts/interfaces/IEntryPoint.sol";
+import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 
 /**
  * Helper class for creating a contract with multiple valid signers for sponsorship paymaster data.

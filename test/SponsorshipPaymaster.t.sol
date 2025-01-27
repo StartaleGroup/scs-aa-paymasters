@@ -2,11 +2,9 @@
 pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
-import {
-    SimpleAccountFactory, SimpleAccount
-} from "@account-abstraction/v0_7/contracts/samples/SimpleAccountFactory.sol";
-import {PackedUserOperation} from "@account-abstraction/v0_7/contracts/interfaces/PackedUserOperation.sol";
-import {EntryPoint} from "@account-abstraction/v0_7/contracts/core/EntryPoint.sol";
+import {SimpleAccountFactory, SimpleAccount} from "@account-abstraction/contracts/samples/SimpleAccountFactory.sol";
+import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
+import {EntryPoint} from "@account-abstraction/contracts/core/EntryPoint.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {SponsorshipPaymaster} from "../src/sponsorship/SponsorshipPaymaster.sol";
 import {TestCounter} from "./TestCounter.sol";
