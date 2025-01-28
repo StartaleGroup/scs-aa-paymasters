@@ -17,10 +17,7 @@ const MOCK_FUNDING_ID = "0x0000000000000000000000000000000000001234" as Address;
 const MOCK_VALID_UNTIL = 0;
 const MOCK_VALID_AFTER = 0;
 const MOCK_SIG = '0x1234';
-const MOCK_DYNAMIC_ADJUSTMENT = 5;
-
-const DEFAULT_VERIFICATION_GAS_LIMIT = 150000;
-const DEFAULT_PRE_VERIFICATION_GAS = 21000;
+const MOCK_DYNAMIC_ADJUSTMENT = 1;
 
 function getPaymasterData(validUntil: number, validAfter: number) {
   const data = {
@@ -50,28 +47,32 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
   let sponsorshipPaymasterAbi;
   let counterAbi;
 
-  let simpleAccountOwnerPrivateKey: string;
+  let simpleAccountOwnerPrivateKey: Hex;
   let simpleAccountOwnerAccount: PrivateKeyAccount;
-  let paymasterSignerPrivateKey: string;
+  let paymasterSignerPrivateKey: Hex;
   let paymasterSignerAccount: PrivateKeyAccount;
+  let paymasterOwnerPrivateKey: Hex;
+  let paymasterOwnerAccount: PrivateKeyAccount;
 
   before(async () => {
+    let bundlerURL = process.env.BUNDLER_URL ?? "http://localhost:3000";
+
     paymasterAddress = process.env.PAYMASTER_ADDRESS as Address;
     entryPointAddress = process.env.ENTRY_POINT_ADDRESS as Address;
     simpleAccountFactoryAddress = process.env.SINPLE_ACCOUNT_FACTORY as Address;
     counterAddress = process.env.COUNTER_ADDRESS as Address
 
-    let bundlerURL = process.env.BUNDLER_URL ?? "http://localhost:3000";
-    let bundlerAddress = process.env.BUNDLER_ADDRESS as Address;
-
     // Simple Account Owner
-    simpleAccountOwnerPrivateKey = process.env.SIMPLE_ACCOUNT_OWNER_PRIVATE_KEY;
-
-    simpleAccountOwnerAccount = privateKeyToAccount(simpleAccountOwnerPrivateKey as Hex);
+    simpleAccountOwnerPrivateKey = process.env.SIMPLE_ACCOUNT_OWNER_PRIVATE_KEY as Hex;
+    simpleAccountOwnerAccount = privateKeyToAccount(simpleAccountOwnerPrivateKey);
 
     // Paymaster Signer
-    paymasterSignerPrivateKey = process.env.PAYMASTER_SIGNER_PRIVATE_KEY;
-    paymasterSignerAccount = privateKeyToAccount(paymasterSignerPrivateKey as Hex);
+    paymasterSignerPrivateKey = process.env.PAYMASTER_SIGNER_PRIVATE_KEY as Hex;
+    paymasterSignerAccount = privateKeyToAccount(paymasterSignerPrivateKey);
+
+    // Paymaster Owner
+    paymasterOwnerPrivateKey = process.env.PAYMASTER_OWNER_PRIVATE_KEY as Hex;
+    paymasterOwnerAccount = privateKeyToAccount(paymasterOwnerPrivateKey);
 
     entryPointAbi = JSON.parse(
       fs.readFileSync(path.resolve(__dirname, "../abis/EntryPoint.json"), 'utf8')
@@ -102,20 +103,9 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
 
     const [defaultWalletAddress] = await walletClient.getAddresses();
 
-    // Make sure the Bundler EOA has sufficient amount of ETH
-    console.log("Bundler Address: ", bundlerAddress);
-    const bundlerBalance = await publicClient.getBalance({
-      address: bundlerAddress,
-    });
-    if (bundlerBalance === BigInt(0)) {
-      console.log("Bundler EOA has no ETH, please fund it first");
-      process.exit(1);
-    }
-    console.log("Bundler Balance: ", bundlerBalance);
-
     // @ts-ignore
     await walletClient.sendTransaction({
-      account: privateKeyToAccount("0xb10784b3e33005aa8e83faca861cbda4794399bd1a25746fcece4fc93e4dccc8"),
+      account: paymasterOwnerAccount,
       to: paymasterAddress,
       value: parseEther("2"),
       data: encodeFunctionData({
@@ -137,14 +127,6 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
         args: [paymasterAddress],
       }),
     });
-
-    const isSigner = await publicClient.readContract({
-      address: paymasterAddress,
-      abi: sponsorshipPaymasterAbi,
-      functionName: "signers",
-      args: [paymasterSignerAccount.address],
-    })
-    console.log("Is Signer: ", isSigner);
   })
 
   describe('#parsePaymasterAndData', () => {
@@ -162,8 +144,8 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
         ],
         [
           paymasterAddress,
-          BigInt(DEFAULT_VERIFICATION_GAS_LIMIT),
-          BigInt(DEFAULT_PRE_VERIFICATION_GAS),
+          BigInt(1500),
+          BigInt(1500),
           MOCK_FUNDING_ID,
           MOCK_VALID_UNTIL,
           MOCK_VALID_AFTER,
@@ -171,15 +153,13 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
           MOCK_SIG
         ]
       )
-      console.log('PAYMASTER AND DATA: ', paymasterAndData)
+
       const res = await publicClient.readContract({
         address: paymasterAddress,
         abi: sponsorshipPaymasterAbi,
         functionName: "parsePaymasterAndData",
         args: [paymasterAndData],
       });
-
-      console.log(res)
 
       expect(res[0]).to.be.equal(MOCK_FUNDING_ID);
       expect(res[1]).to.be.equal(MOCK_VALID_UNTIL);
@@ -189,7 +169,7 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
     })
   });
 
-  describe("succeed with valid signature", () => {
+  describe("#succeed with valid signature", () => {
     it("Counter incremented sponsored by Paymaster", async () => {
       // Create a simple smart account
       const simpleAccount = await toSimpleSmartAccount({
@@ -231,11 +211,8 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
 
       // Prepare paymaster data
       const paymasterData = getPaymasterData(0, 0); // no expiration
-
-      // Before Hashing
       userOp.paymaster = paymasterAddress;
       userOp.paymasterData = paymasterData;
-      // set paymaster gas
       userOp.paymasterVerificationGasLimit = BigInt(251165);
       userOp.paymasterPostOpGasLimit = BigInt(46908);
       userOp.preVerificationGas = BigInt(46908 + 5000);
@@ -247,16 +224,12 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
         args: [toPackedUserOperation(userOp)],
       });
 
-      // sign the hash
       const sig = await walletClient.signMessage({
         account: paymasterSignerAccount,
         message: { raw: toBytes(hash as Hex) }
       })
 
-      console.log(sig);
-
       userOp.signature = null;
-
       // Send User Operation
       // @ts-ignore
       const userOpHash = await bundlerClient.sendUserOperation({ 
