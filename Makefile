@@ -16,7 +16,7 @@ setup:
 # Integration tests by mocha
 .PHONY: integration
 integration:
-	npm run test
+	integration/scripts/run.sh
 
 # Unit tests by forge
 .PHONY: test

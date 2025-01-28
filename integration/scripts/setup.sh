@@ -27,4 +27,9 @@ cast send --unlocked --from $(cast rpc eth_accounts | tail -n 1 | tr -d '[]"') -
 ## Deploy
 ### Paymaster
 # forge create --rpc-url http://localhost:8545 --constructor-args $ENTRYPOINT [$PAYMASTER_SIGNER] \
-    # --private-key $(cat integration/keys/deployer.key) src/v0_7/sponsorship/SponsorshipPaymaster.sol:SponsorshipPaymaster
+    # --private-key $(cat integration/keys/deployer.key) src/sponsorship/SponsorshipPaymaster.sol:SponsorshipPaymaster
+
+SALT=0x90d8084deab30c2a37c45e8d47f49f2f7965183cb6990a98943ef94940681de3 \
+    SIGNERS=$(PAYMASTER_SIGNER) \
+    forge script script/SponsorshipPaymaster.s.sol:DeploySponsorshipPaymaster \
+    --rpc-url http://localhost:8545 --broadcast --private-key $(cat integration/keys/deployer.key)
