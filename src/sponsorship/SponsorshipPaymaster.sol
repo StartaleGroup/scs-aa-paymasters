@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {BasePaymaster} from "@account-abstraction/contracts/core/BasePaymaster.sol";
+import {BasePaymaster} from "../base/BasePaymaster.sol";
 import {UserOperationLib, PackedUserOperation} from "@account-abstraction/contracts/core/UserOperationLib.sol";
 import {_packValidationData} from "@account-abstraction/contracts/core/Helpers.sol";
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
@@ -38,8 +38,8 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         address indexed user
     );
 
-    constructor(address _entryPoint, address[] memory _signers)
-        BasePaymaster(IEntryPoint(_entryPoint))
+    constructor(address _owner, address _entryPoint, address[] memory _signers)
+        BasePaymaster(_owner, IEntryPoint(_entryPoint))
         MultiSigners(_signers)
     {}
 

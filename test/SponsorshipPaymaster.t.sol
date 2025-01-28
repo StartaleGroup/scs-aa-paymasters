@@ -52,7 +52,7 @@ contract SponsorshipPaymasterTest is Test {
 
         // Set paymasterOwner as the msg.sender of next call, ensuring owner of Paymaster is set to paymasterOwner.
         vm.prank(paymasterOwner);
-        paymaster = new SponsorshipPaymaster(address(entryPoint), new address[](0));
+        paymaster = new SponsorshipPaymaster(paymasterOwner, address(entryPoint), new address[](0));
         paymaster.deposit{value: 10000e18}();
 
         vm.prank(paymasterOwner);
@@ -61,7 +61,8 @@ contract SponsorshipPaymasterTest is Test {
 
     function testDeployment() external {
         vm.prank(paymasterOwner);
-        SponsorshipPaymaster deployedPaymaster = new SponsorshipPaymaster(address(entryPoint), new address[](0));
+        SponsorshipPaymaster deployedPaymaster =
+            new SponsorshipPaymaster(paymasterOwner, address(entryPoint), new address[](0));
         vm.prank(paymasterOwner);
         deployedPaymaster.addSigner(paymasterSigner);
 
