@@ -13,7 +13,4 @@ node_modules/
 # Docs
 docs/
 
-# Dotenv file
-.env
-
 out.log

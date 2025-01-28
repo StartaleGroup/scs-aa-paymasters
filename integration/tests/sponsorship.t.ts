@@ -113,16 +113,17 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
     }
     console.log("Bundler Balance: ", bundlerBalance);
 
-    // await walletClient.sendTransaction({
-      // account: defaultWalletAddress,
-      // to: paymasterAddress,
-      // value: parseEther("2"),
-      // data: encodeFunctionData({
-        // abi: sponsorshipPaymasterAbi,
-        // functionName: "addStake",
-        // args: [1],
-      // })
-    // });
+    // @ts-ignore
+    await walletClient.sendTransaction({
+      account: privateKeyToAccount("0xb10784b3e33005aa8e83faca861cbda4794399bd1a25746fcece4fc93e4dccc8"),
+      to: paymasterAddress,
+      value: parseEther("2"),
+      data: encodeFunctionData({
+        abi: sponsorshipPaymasterAbi,
+        functionName: "addStake",
+        args: [2],
+      })
+    });
 
     // Deposit ETH to Paymaster address in EntryPoint contract
     // @ts-ignore
@@ -234,21 +235,17 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
       // Before Hashing
       userOp.paymaster = paymasterAddress;
       userOp.paymasterData = paymasterData;
-      userOp.preVerificationGas = 46908 + 5000;
-      // userOp.verificationGasLimit = 150000;
+      // set paymaster gas
+      userOp.paymasterVerificationGasLimit = BigInt(251165);
+      userOp.paymasterPostOpGasLimit = BigInt(46908);
+      userOp.preVerificationGas = BigInt(46908 + 5000);
 
-      console.log("BEFORE HASHING PACKED USER OPERATION")
-      console.log(toPackedUserOperation(userOp))
       const hash = await publicClient.readContract({
         address: paymasterAddress,
         abi: sponsorshipPaymasterAbi,
         functionName: "getHash",
         args: [toPackedUserOperation(userOp)],
       });
-
-      console.log(hash)
-      console.log("PAYMASTER SIGNER ACCOUNT")
-      console.log(paymasterSignerAccount.address)
 
       // sign the hash
       const sig = await walletClient.signMessage({
@@ -257,6 +254,8 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
       })
 
       console.log(sig);
+
+      userOp.signature = null;
 
       // Send User Operation
       // @ts-ignore
