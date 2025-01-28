@@ -59,7 +59,7 @@ Deploy using forge create2
 
 ```
 # deploy
-SALT=$SALT SIGNERS=$SIGNERS_COMMA_DELIMITED forge script script/SponsorshipPaymaster.s.sol:DeploySponsorshipPaymaster --rpc-url $RPC_URL --broadcast --private-key $PRIV_KEY
+SALT=$SALT OWNER=$OWNER SIGNERS=$SIGNERS_COMMA_DELIMITED forge script script/SponsorshipPaymaster.s.sol:DeploySponsorshipPaymaster --rpc-url $RPC_URL --broadcast --private-key $PRIV_KEY
 
 # and verify
 forge verify-contract \
@@ -74,6 +74,6 @@ src/sponsorship/SponsorshipPaymaster.sol:SponsorshipPaymaster --watch
 
 **Sponsorship Paymaster**
 
-| Network        | Address                                                                                                                  |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Soneium Minato | `0x8E47BF1E8EF8efA64462e94D40E73421e1563DB3` (salt:`0x90d8084deab30c2a37c45e8d47f49f2f7965183cb6990a98943ef94940681de3`) |
+| Network        | Address                                                                                                                                                                                                                                                      |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Soneium Minato | `0x653ceAB2A4918641e9996850B0F4F30b51085076` (salt:`0x90d8084deab30c2a37c45e8d47f49f2f7965183cb6990a98943ef94940681de3`, constructor owner: `0xFAD1f284416fA799647e25064D5F75b90e95664e`, constructor signers `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE` ) |

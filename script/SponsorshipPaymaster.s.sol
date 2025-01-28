@@ -14,18 +14,19 @@ contract DeploySponsorshipPaymaster is Script {
 
     function run() public {
         uint256 salt = vm.envUint("SALT");
+        address owner = vm.envAddress("OWNER");
         string[] memory signers = vm.envString("SIGNERS", ",");
         address[] memory signersAddr = new address[](signers.length);
         for (uint256 i = 0; i < signers.length; i++) {
             signersAddr[i] = vm.parseAddress(signers[i]);
         }
 
-        run(salt, signersAddr);
+        run(salt, owner, signersAddr);
     }
 
-    function run(uint256 _salt, address[] memory _signers) public {
+    function run(uint256 _salt, address _owner, address[] memory _signers) public {
         vm.startBroadcast();
-        SponsorshipPaymaster pm = new SponsorshipPaymaster{salt: bytes32(_salt)}(entryPoint, _signers);
+        SponsorshipPaymaster pm = new SponsorshipPaymaster{salt: bytes32(_salt)}(_owner, entryPoint, _signers);
         console.log("Contract deployed at ", address(pm));
         vm.stopBroadcast();
     }
