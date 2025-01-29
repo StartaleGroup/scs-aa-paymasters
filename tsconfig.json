@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "outDir": "./integration/dist",
+    "rootDir": "./integration",
+  },
+  "include": ["integration/**/*"],
+  "exclude": ["node_modules"],
+  "strict": true,
+  "target": "esnext",
+  "module": "esnext",
+  "resolveJsonModule": true
+}

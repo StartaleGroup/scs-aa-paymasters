@@ -47,10 +47,20 @@ See more details here: https://book.getfoundry.sh/projects/project-layout.
 forge build
 ```
 
-### Test (Unit tests)
+### Tests
+
+#### Unit Tests
 
 ```
-forge test
+forge test # or make test
+```
+
+#### Integration Test
+
+```
+npm i
+make setup
+make integration
 ```
 
 ## Deploy
