@@ -1,6 +1,6 @@
 import { equal } from "assert";
 import { createPublicClient, createWalletClient, type PrivateKeyAccount, encodePacked, toBytes, fromHex, http, type PublicClient, type WalletClient, parseEther, encodeFunctionData, type Address, type Hex } from 'viem';
-import { type BundlerClient, createBundlerClient, toPackedUserOperation} from 'viem/account-abstraction';
+import { type BundlerClient, createBundlerClient, toPackedUserOperation, type UserOperation} from 'viem/account-abstraction';
 import { localhost } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { toSimpleSmartAccount } from "permissionless/accounts";
@@ -18,6 +18,9 @@ const MOCK_VALID_UNTIL = 0;
 const MOCK_VALID_AFTER = 0;
 const MOCK_SIG = '0x1234';
 const MOCK_DYNAMIC_ADJUSTMENT = 1;
+
+const DUMMY_PAYMASTER_VERIFICATION_GAS_LIMIT = BigInt(251165);
+const DUMMY_PAYMASTER_POST_OP_GAS_LIIMIT = BigInt(46908);
 
 function getPaymasterData(validUntil: number, validAfter: number) {
   const data = {
@@ -53,6 +56,24 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
   let paymasterSignerAccount: PrivateKeyAccount;
   let paymasterOwnerPrivateKey: Hex;
   let paymasterOwnerAccount: PrivateKeyAccount;
+
+  async function fillPaymasterDataSignature(userOperation: UserOperation) : Promise<UserOperation> {
+    const hash = await publicClient.readContract({
+      address: paymasterAddress,
+      abi: sponsorshipPaymasterAbi,
+      functionName: "getHash",
+      args: [toPackedUserOperation(userOperation)],
+    });
+    const sig = await walletClient.signMessage({
+      account: paymasterSignerAccount,
+      message: { raw: toBytes(hash as Hex) }
+    })
+    userOperation.paymasterData = encodePacked(
+      ["bytes", "bytes"],
+      [userOperation.paymasterData, sig]
+    );
+    return userOperation
+  }
 
   before(async () => {
     let bundlerURL = process.env.BUNDLER_URL ?? "http://localhost:3000";
@@ -195,7 +216,8 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
       }).then((response) => fromHex(response.data, "number"));
 
       // @ts-ignore
-      const userOp = await bundlerClient.prepareUserOperation({
+      // base user op preparation doesn't necessarilly call prepareUserOperation, we can craft user op object locally
+      let baseUserOp = await bundlerClient.prepareUserOperation({
         account: simpleAccount,
         calls: [{
           to: counterAddress,
@@ -211,33 +233,33 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
 
       // Prepare paymaster data
       const paymasterData = getPaymasterData(0, 0); // no expiration
-      userOp.paymaster = paymasterAddress;
-      userOp.paymasterData = paymasterData;
-      userOp.paymasterVerificationGasLimit = BigInt(251165);
-      userOp.paymasterPostOpGasLimit = BigInt(46908);
-      userOp.preVerificationGas = BigInt(46908 + 5000);
+      baseUserOp.paymaster = paymasterAddress;
+      baseUserOp.paymasterData = paymasterData;
+      baseUserOp.paymasterVerificationGasLimit = DUMMY_PAYMASTER_VERIFICATION_GAS_LIMIT;
+      baseUserOp.paymasterPostOpGasLimit = DUMMY_PAYMASTER_POST_OP_GAS_LIIMIT;
+      baseUserOp = await fillPaymasterDataSignature(baseUserOp);
 
-      const hash = await publicClient.readContract({
-        address: paymasterAddress,
-        abi: sponsorshipPaymasterAbi,
-        functionName: "getHash",
-        args: [toPackedUserOperation(userOp)],
+      // TODO: paymasterPostOpGasLimit is not included in estimates, how can we estimate?
+      const estimatedGas = await bundlerClient.estimateUserOperationGas({
+        ...baseUserOp,
       });
 
-      const sig = await walletClient.signMessage({
-        account: paymasterSignerAccount,
-        message: { raw: toBytes(hash as Hex) }
-      })
+      let userOp = {
+        ...baseUserOp,
+        callGasLimit: estimatedGas.callGasLimit,
+        preVerificationGas: estimatedGas.preVerificationGas + BigInt(5000), // TODO: Rundler deny without extra gas to estimated value, need investigation
+        verificationGasLimit: estimatedGas.verificationGasLimit,
+        paymasterVerificationGasLimit: estimatedGas.paymasterVerificationGasLimit,
+        paymasterData: paymasterData, // reset paymaster data to remove previous signature for gas estimation
+      }
+      // @ts-ignore
+      userOp = await fillPaymasterDataSignature(userOp);
 
-      userOp.signature = null;
       // Send User Operation
       // @ts-ignore
       const userOpHash = await bundlerClient.sendUserOperation({ 
         ...userOp,
-        paymasterData: encodePacked(
-          ["bytes", "bytes"],
-          [paymasterData, sig]
-        ),
+        signature: null // don't use previous account signature, need to sign inside `sendUserOperation` again
       });
 
       await bundlerClient.waitForUserOperationReceipt({ 
