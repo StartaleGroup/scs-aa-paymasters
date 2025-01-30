@@ -28,6 +28,8 @@ Installation: https://book.getfoundry.sh/getting-started/installation
 curl -L https://foundry.paradigm.xyz | bash
 ```
 
+**Forge version `0.3.0` or higher is required.**
+
 ## Develop
 
 Repository is structured based on Foundry's project layout.
@@ -86,4 +88,4 @@ src/sponsorship/SponsorshipPaymaster.sol:SponsorshipPaymaster --watch
 
 | Network        | Address                                                                                                                                                                                                                                                      |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Soneium Minato | `0x653ceAB2A4918641e9996850B0F4F30b51085076` (salt:`0x90d8084deab30c2a37c45e8d47f49f2f7965183cb6990a98943ef94940681de3`, constructor owner: `0xFAD1f284416fA799647e25064D5F75b90e95664e`, constructor signers `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE` ) |
+| Soneium Minato | `0x0a54E88C337e54989E38a8d4D8dcA4A38cC5A96b` (salt:`0x90d8084deab30c2a37c45e8d47f49f2f7965183cb6990a98943ef94940681de3`, constructor owner: `0xFAD1f284416fA799647e25064D5F75b90e95664e`, constructor signers `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE` ) |
