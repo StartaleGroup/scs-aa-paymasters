@@ -239,9 +239,12 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
       baseUserOp.paymasterPostOpGasLimit = DUMMY_PAYMASTER_POST_OP_GAS_LIIMIT;
       baseUserOp = await fillPaymasterDataSignature(baseUserOp);
 
-      // TODO: paymasterPostOpGasLimit is not included in estimates, how can we estimate?
+      // for gas estimation, use dummy signarure
+      // What's dummy signature? useful links, https://www.alchemy.com/blog/erc-4337-gas-estimation#user-operation-flow, https://www.alchemy.com/blog/dummy-signatures-and-gas-token-transfers#how-to-calculate-dummy-signature-values
+      const dummySignature = "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c";
       const estimatedGas = await bundlerClient.estimateUserOperationGas({
         ...baseUserOp,
+        signature: dummySignature,
       });
 
       let userOp = {
