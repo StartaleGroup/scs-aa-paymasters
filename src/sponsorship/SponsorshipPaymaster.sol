@@ -9,47 +9,108 @@ import {_packValidationData} from "@account-abstraction/contracts/core/Helpers.s
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {MultiSigners} from "./MultiSigners.sol";
 
+
 contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
     using UserOperationLib for PackedUserOperation;
 
     uint256 private constant FUNDING_ID_OFFSET = PAYMASTER_DATA_OFFSET;
-
     uint256 private constant FUNDING_ID_LENGTH = 20;
-
     uint256 private constant VALID_UNTIL_TIMESTAMP_OFFSET = FUNDING_ID_OFFSET + FUNDING_ID_LENGTH;
-
     uint256 private constant TIMESTAMP_DATA_LENGTH = 6;
-
     uint256 private constant VALID_AFTER_TIMESTAMP_OFFSET = VALID_UNTIL_TIMESTAMP_OFFSET + TIMESTAMP_DATA_LENGTH;
+    uint256 private constant PRICE_MARKUP_OFFSET = VALID_AFTER_TIMESTAMP_OFFSET + TIMESTAMP_DATA_LENGTH;
+    uint256 private constant PRICE_MARKUP_LENGTH = 4;
+    // Denominator to prevent precision errors when applying price markup
+    uint256 private constant _PRICE_DENOMINATOR = 1e6;
+    uint256 private constant SIGNATURE_OFFSET = PRICE_MARKUP_OFFSET + PRICE_MARKUP_LENGTH;
+    uint256 private constant _UNACCOUNTED_GAS_LIMIT = 100_000;
 
-    uint256 private constant DYNAMIC_ADJUSTMENT_OFFSET = VALID_AFTER_TIMESTAMP_OFFSET + TIMESTAMP_DATA_LENGTH;
+    address public feeCollector;
+    uint256 public minDeposit;
+    mapping(address => uint256) public userBalances;
+    mapping(address => uint256) public withdrawalRequests;
+    mapping(address => uint256) public lastWithdrawalTimestamp;
+    uint256 public withdrawalDelay;
+    uint256 public unaccountedGas;
 
-    uint256 private constant DYNAMIC_ADJUSTMENT_LENGTH = 4;
-
-    uint256 private constant SIGNATURE_OFFSET = DYNAMIC_ADJUSTMENT_OFFSET + DYNAMIC_ADJUSTMENT_LENGTH;
-
-    /// @notice The paymaster signature length is invalid.
     error PaymasterSignatureLengthInvalid();
+    error InsufficientFunds(address user, uint256 balance, uint256 required);
+    error NoWithdrawalRequest(address user);
+    error WithdrawalTooSoon(address user, uint256 nextAllowedTime);
+    error LowDeposit(uint256 provided, uint256 required);
+    error UseDepositForInstead();
+    error SubmitRequestInstead();
+    error UnaccountedGasTooHigh();
 
-    /// @dev Emitted when a user operation is sponsored by the paymaster.
-    event UserOperationSponsored(
-        bytes32 indexed userOpHash,
-        /// @param The user that requested sponsorship.
-        address indexed user
-    );
+    event UserOperationSponsored(bytes32 indexed userOpHash, address indexed user);
+    event DepositAdded(address indexed user, uint256 amount);
+    event GasBalanceDeducted(address indexed user, uint256 amount, uint256 premium);
+    event WithdrawalRequested(address indexed user, uint256 amount);
+    event WithdrawalExecuted(address indexed user, uint256 amount);
+    event FeeCollectorChanged(address indexed oldFeeCollector, address indexed newFeeCollector);
+    event MinDepositChanged(uint256 oldMinDeposit, uint256 newMinDeposit);
+    event RefundProcessed(address indexed user, uint256 amount);
 
-    constructor(address _owner, address _entryPoint, address[] memory _signers)
+    constructor(address _owner, address _entryPoint, address[] memory _signers, address _feeCollector, uint256 _minDeposit, uint256 _withdrawalDelay, uint256 _unaccountedGas)
         BasePaymaster(_owner, IEntryPoint(_entryPoint))
         MultiSigners(_signers)
-    {}
+    {
+        require(_withdrawalDelay >= 60, "Withdrawal delay too short");
+        feeCollector = _feeCollector;
+        minDeposit = _minDeposit;
+        withdrawalDelay = _withdrawalDelay;
+        unaccountedGas = _unaccountedGas;
+    }
 
-    /**
-     * return the hash we're going to sign off-chain (and validate on-chain)
-     * this method is called by the off-chain service, to sign the request.
-     * it is called on-chain from the validatePaymasterUserOp, to validate the signature.
-     * note that this signature covers all fields of the UserOperation, except the "paymasterAndData",
-     * which will carry the signature itself.
-     */
+    function depositForUser() external payable {
+        if (msg.value == 0) revert LowDeposit(msg.value, minDeposit);
+        
+        // Ensure first-time deposit meets minDeposit
+        if (userBalances[msg.sender] == 0 && msg.value < minDeposit) {
+            revert LowDeposit(msg.value, minDeposit);
+        }
+
+        userBalances[msg.sender] += msg.value;
+        emit DepositAdded(msg.sender, msg.value);
+    }
+
+    function setMinDeposit(uint256 newMinDeposit) external onlyOwner {
+        emit MinDepositChanged(minDeposit, newMinDeposit);
+        minDeposit = newMinDeposit;
+    }
+
+    function requestWithdrawal(uint256 amount) external {
+        if (userBalances[msg.sender] < amount) revert InsufficientFunds(msg.sender, userBalances[msg.sender], amount);
+        if (block.timestamp <= lastWithdrawalTimestamp[msg.sender] + withdrawalDelay) {
+            revert WithdrawalTooSoon(msg.sender, lastWithdrawalTimestamp[msg.sender] + withdrawalDelay);
+        }
+        withdrawalRequests[msg.sender] = amount;
+        lastWithdrawalTimestamp[msg.sender] = block.timestamp;
+        emit WithdrawalRequested(msg.sender, amount);
+    }
+
+    function executeWithdrawal() external {
+        uint256 amount = withdrawalRequests[msg.sender];
+        if (amount == 0) revert NoWithdrawalRequest(msg.sender);
+        if (userBalances[msg.sender] < amount) revert InsufficientFunds(msg.sender, userBalances[msg.sender], amount);
+
+        userBalances[msg.sender] -= amount;
+        withdrawalRequests[msg.sender] = 0;
+        lastWithdrawalTimestamp[msg.sender] = block.timestamp;
+
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        require(success, "Withdrawal transfer failed");
+
+        emit WithdrawalExecuted(msg.sender, amount);
+    }
+
+    function setFeeCollector(address newFeeCollector) external onlyOwner {
+        require(newFeeCollector != address(0), "Invalid feeCollector address");
+        address oldFeeCollector = feeCollector;
+        feeCollector = newFeeCollector;
+        emit FeeCollectorChanged(oldFeeCollector, newFeeCollector);
+    }
+
     function getHash(PackedUserOperation calldata userOp) public view returns (bytes32) {
         return keccak256(
             abi.encode(
@@ -68,30 +129,14 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         );
     }
 
-    /**
-     * @notice Internal helper to parse and validate the userOperation's paymasterAndData.
-     * @param _userOp The userOperation.
-     * @param _userOpHash The userOperation hash.
-     * @return (context, validationData) The context and validation data to return to the EntryPoint.
-     *
-     * verify our external signer signed this request.
-     * the "paymasterAndData" is expected to be the paymaster and a signature over the entire request params
-     * paymasterAndData[:20] : address(this)
-     * paymasterAndData[20:36] : paymaster validation gas
-     * paymasterAndData[36:52] : paymaster post-op gas
-     * paymasterAndData[52:72] : fundingId
-     * paymasterAndData[72:84] : abi.packedEncode(validUntil, validAfter) - uint48 (6bytes length) for each
-     * paymasterAndData[84:88] : dynamicAdjustment
-     * paymasterAndData[88:] : signature
-     */
-    function _validatePaymasterUserOp(PackedUserOperation calldata _userOp, bytes32 _userOpHash, uint256 /* maxCost */ )
+    function _validatePaymasterUserOp(PackedUserOperation calldata _userOp, bytes32 _userOpHash, uint256 requiredPreFund)
         internal
         override
         returns (bytes memory, uint256)
     {
-        (address _fundingId, uint48 validUntil, uint48 validAfter, uint32 _dynamicAdjustment, bytes calldata signature)
+        (address fundingId, uint48 validUntil, uint48 validAfter, uint32 priceMarkup, bytes calldata signature)
         = parsePaymasterAndData(_userOp.paymasterAndData);
-        // ECDSA library supports both 64 and 65-byte long signatures.
+
         if (signature.length != 64 && signature.length != 65) {
             revert PaymasterSignatureLengthInvalid();
         }
@@ -99,12 +144,47 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         bytes32 hash = MessageHashUtils.toEthSignedMessageHash(getHash(_userOp));
         address recoveredSigner = ECDSA.recover(hash, signature);
 
-        // Don't revert even if signature is invalid.
         bool isSignatureValid = signers[recoveredSigner];
         uint256 validationData = _packValidationData(!isSignatureValid, validUntil, validAfter);
 
+        if (userBalances[fundingId] < requiredPreFund) {
+            revert InsufficientFunds(fundingId, userBalances[fundingId], requiredPreFund);
+        }
+        userBalances[fundingId] -= requiredPreFund;
+        
         emit UserOperationSponsored(_userOpHash, _userOp.getSender());
-        return ("", validationData);
+        return (abi.encode(fundingId, requiredPreFund, priceMarkup), validationData);
+    }
+
+    function _postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost, uint256 actualUserOpFeePerGas)
+        internal
+        override
+    {
+        (address fundingId, uint256 prechargedAmount, uint32 priceMarkup) = abi.decode(context, (address, uint256, uint32));
+
+        // Include unaccountedGas since EP doesn't include this in actualGasCost
+        // unaccountedGas = postOpGas + EP overhead gas 
+        actualGasCost = actualGasCost + (unaccountedGas * actualUserOpFeePerGas);
+
+        uint256 adjustedGasCost = (actualGasCost * priceMarkup) / _PRICE_DENOMINATOR;
+        uint256 premium = adjustedGasCost - actualGasCost;
+        userBalances[feeCollector] += premium;
+
+        if (prechargedAmount > adjustedGasCost) {
+            // Refund excess gas fees
+            uint256 refund = prechargedAmount - adjustedGasCost;
+            userBalances[fundingId] += refund;
+            emit RefundProcessed(fundingId, refund);
+        } else {
+            // Handle undercharge scenario
+            uint256 deduction = adjustedGasCost - prechargedAmount;
+            if (userBalances[fundingId] < deduction) {
+                revert InsufficientFunds(fundingId, userBalances[fundingId], deduction);
+            }
+            userBalances[fundingId] -= deduction;
+        }
+
+        emit GasBalanceDeducted(fundingId, actualGasCost, premium);
     }
 
     function parsePaymasterAndData(bytes calldata _paymasterAndData)
@@ -114,14 +194,34 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
             address fundingId,
             uint48 validUntil,
             uint48 validAfter,
-            uint32 dynamicAdjustment,
+            uint32 priceMarkup,
             bytes calldata signature
         )
     {
+        require(_paymasterAndData.length > SIGNATURE_OFFSET, "Invalid paymasterAndData length");
         fundingId = address(bytes20(_paymasterAndData[FUNDING_ID_OFFSET:VALID_UNTIL_TIMESTAMP_OFFSET]));
         validUntil = uint48(bytes6(_paymasterAndData[VALID_UNTIL_TIMESTAMP_OFFSET:VALID_AFTER_TIMESTAMP_OFFSET]));
-        validAfter = uint48(bytes6(_paymasterAndData[VALID_AFTER_TIMESTAMP_OFFSET:DYNAMIC_ADJUSTMENT_OFFSET]));
-        dynamicAdjustment = uint32(bytes4(_paymasterAndData[DYNAMIC_ADJUSTMENT_OFFSET:SIGNATURE_OFFSET]));
+        validAfter = uint48(bytes6(_paymasterAndData[VALID_AFTER_TIMESTAMP_OFFSET:PRICE_MARKUP_OFFSET]));
+        priceMarkup = uint32(bytes4(_paymasterAndData[PRICE_MARKUP_OFFSET:SIGNATURE_OFFSET]));
         signature = _paymasterAndData[SIGNATURE_OFFSET:];
+    }
+
+    /**
+     * @dev Override the default implementation.
+     */
+    function deposit() external payable virtual override {
+        revert UseDepositForInstead();
+    }
+
+    function withdrawTo(address payable withdrawAddress, uint256 amount) external virtual override {
+        (withdrawAddress, amount);
+        revert SubmitRequestInstead();
+    }
+
+    function setUnaccountedGas(uint256 value) external payable onlyOwner {
+        if (value > _UNACCOUNTED_GAS_LIMIT) {
+            revert UnaccountedGasTooHigh();
+        }
+        unaccountedGas = value;
     }
 }
