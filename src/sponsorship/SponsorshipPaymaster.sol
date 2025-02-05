@@ -9,7 +9,6 @@ import {_packValidationData} from "@account-abstraction/contracts/core/Helpers.s
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {MultiSigners} from "./MultiSigners.sol";
 
-
 contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
     using UserOperationLib for PackedUserOperation;
 
@@ -53,10 +52,15 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
     event MinDepositChanged(uint256 oldMinDeposit, uint256 newMinDeposit);
     event RefundProcessed(address indexed user, uint256 amount);
 
-    constructor(address _owner, address _entryPoint, address[] memory _signers, address _feeCollector, uint256 _minDeposit, uint256 _withdrawalDelay, uint256 _unaccountedGas)
-        BasePaymaster(_owner, IEntryPoint(_entryPoint))
-        MultiSigners(_signers)
-    {
+    constructor(
+        address _owner,
+        address _entryPoint,
+        address[] memory _signers,
+        address _feeCollector,
+        uint256 _minDeposit,
+        uint256 _withdrawalDelay,
+        uint256 _unaccountedGas
+    ) BasePaymaster(_owner, IEntryPoint(_entryPoint)) MultiSigners(_signers) {
         require(_withdrawalDelay >= 60, "Withdrawal delay too short");
         feeCollector = _feeCollector;
         minDeposit = _minDeposit;
@@ -71,7 +75,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
             revert LowDeposit(msg.value, minDeposit);
         }
 
-        entryPoint.depositTo{ value: msg.value }(address(this));
+        entryPoint.depositTo{value: msg.value}(address(this));
         userBalances[msg.sender] += msg.value;
 
         emit DepositAdded(msg.sender, msg.value);
@@ -110,7 +114,6 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
 
         // Ensure amount does not exceed available balance
         amount = amount > currentBalance ? currentBalance : amount;
-        if (amount == 0) revert CanNotWithdrawZeroAmount();
 
         uint256 paymasterDeposit = entryPoint.balanceOf(address(this));
         if (amount > paymasterDeposit) {
@@ -129,7 +132,6 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
 
         emit WithdrawalExecuted(fundingId, amount);
     }
-
 
     function setFeeCollector(address newFeeCollector) external onlyOwner {
         require(newFeeCollector != address(0), "Invalid feeCollector address");
@@ -164,13 +166,9 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         PackedUserOperation calldata _userOp,
         bytes32 _userOpHash,
         uint256 requiredPreFund
-    )
-        internal
-        override
-        returns (bytes memory, uint256)
-    {
-        (address fundingId, uint48 validUntil, uint48 validAfter, uint32 priceMarkup, bytes calldata signature) 
-            = parsePaymasterAndData(_userOp.paymasterAndData);
+    ) internal override returns (bytes memory, uint256) {
+        (address fundingId, uint48 validUntil, uint48 validAfter, uint32 priceMarkup, bytes calldata signature) =
+            parsePaymasterAndData(_userOp.paymasterAndData);
 
         // Ensure valid signature length (64 or 65 bytes)
         if (signature.length != 64 && signature.length != 65) {
@@ -198,14 +196,13 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         uint256 maxPenalty = (
             (
                 uint128(uint256(_userOp.accountGasLimits))
-                + uint128(bytes16(_userOp.paymasterAndData[PAYMASTER_POSTOP_GAS_OFFSET:PAYMASTER_DATA_OFFSET]))
+                    + uint128(bytes16(_userOp.paymasterAndData[PAYMASTER_POSTOP_GAS_OFFSET:PAYMASTER_DATA_OFFSET]))
             ) * 10 * _userOp.unpackMaxFeePerGas()
         ) / 100;
 
         // Calculate effective cost including unaccountedGas and priceMarkup
-        uint256 effectiveCost = (
-            (requiredPreFund + (unaccountedGas * _userOp.unpackMaxFeePerGas())) * priceMarkup
-        ) / _PRICE_DENOMINATOR;
+        uint256 effectiveCost =
+            ((requiredPreFund + (unaccountedGas * _userOp.unpackMaxFeePerGas())) * priceMarkup) / _PRICE_DENOMINATOR;
 
         // Ensure the paymaster can cover the effective cost + max penalty
         if (effectiveCost + maxPenalty > userBalances[fundingId]) {
@@ -219,14 +216,14 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         return (abi.encode(fundingId, priceMarkup, effectiveCost), validationData);
     }
 
-
     function _postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost, uint256 actualUserOpFeePerGas)
         internal
         override
     {
-        (address fundingId, uint256 prechargedAmount, uint32 priceMarkup) = abi.decode(context, (address, uint256, uint32));
+        (address fundingId, uint32 priceMarkup, uint256 prechargedAmount) =
+            abi.decode(context, (address, uint32, uint256));
         // Include unaccountedGas since EP doesn't include this in actualGasCost
-        // unaccountedGas = postOpGas + EP overhead gas 
+        // unaccountedGas = postOpGas + EP overhead gas
         actualGasCost = actualGasCost + (unaccountedGas * actualUserOpFeePerGas);
 
         uint256 adjustedGasCost = (actualGasCost * priceMarkup) / _PRICE_DENOMINATOR;
@@ -241,9 +238,6 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         } else {
             // Handle undercharge scenario
             uint256 deduction = adjustedGasCost - prechargedAmount;
-            if (userBalances[fundingId] < deduction) {
-                revert InsufficientFunds(fundingId, userBalances[fundingId], deduction);
-            }
             userBalances[fundingId] -= deduction;
         }
 
@@ -253,13 +247,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
     function parsePaymasterAndData(bytes calldata _paymasterAndData)
         public
         pure
-        returns (
-            address fundingId,
-            uint48 validUntil,
-            uint48 validAfter,
-            uint32 priceMarkup,
-            bytes calldata signature
-        )
+        returns (address fundingId, uint48 validUntil, uint48 validAfter, uint32 priceMarkup, bytes calldata signature)
     {
         require(_paymasterAndData.length > SIGNATURE_OFFSET, "Invalid paymasterAndData length");
         fundingId = address(bytes20(_paymasterAndData[FUNDING_ID_OFFSET:VALID_UNTIL_TIMESTAMP_OFFSET]));
