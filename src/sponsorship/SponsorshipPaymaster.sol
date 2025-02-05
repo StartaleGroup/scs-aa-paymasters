@@ -41,6 +41,8 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
     error UseDepositForInstead();
     error SubmitRequestInstead();
     error UnaccountedGasTooHigh();
+    error CanNotWithdrawZeroAmount();
+    error InvalidPriceMarkup();
 
     event UserOperationSponsored(bytes32 indexed userOpHash, address indexed user);
     event DepositAdded(address indexed user, uint256 amount);
@@ -64,13 +66,14 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
 
     function depositForUser() external payable {
         if (msg.value == 0) revert LowDeposit(msg.value, minDeposit);
-        
-        // Ensure first-time deposit meets minDeposit
+
         if (userBalances[msg.sender] == 0 && msg.value < minDeposit) {
             revert LowDeposit(msg.value, minDeposit);
         }
 
+        entryPoint.depositTo{ value: msg.value }(address(this));
         userBalances[msg.sender] += msg.value;
+
         emit DepositAdded(msg.sender, msg.value);
     }
 
@@ -89,26 +92,54 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         emit WithdrawalRequested(msg.sender, amount);
     }
 
-    function executeWithdrawal() external {
-        uint256 amount = withdrawalRequests[msg.sender];
-        if (amount == 0) revert NoWithdrawalRequest(msg.sender);
-        if (userBalances[msg.sender] < amount) revert InsufficientFunds(msg.sender, userBalances[msg.sender], amount);
-
-        userBalances[msg.sender] -= amount;
-        withdrawalRequests[msg.sender] = 0;
-        lastWithdrawalTimestamp[msg.sender] = block.timestamp;
-
-        (bool success, ) = payable(msg.sender).call{value: amount}("");
-        require(success, "Withdrawal transfer failed");
-
-        emit WithdrawalExecuted(msg.sender, amount);
+    function setWithdrawalDelay(uint256 newWithdrawalDelay) external onlyOwner {
+        withdrawalDelay = newWithdrawalDelay;
     }
+
+    function executeWithdrawal(address fundingId) external {
+        uint256 amount = withdrawalRequests[fundingId];
+        if (amount == 0) revert NoWithdrawalRequest(fundingId);
+
+        uint256 currentBalance = userBalances[fundingId];
+        if (currentBalance == 0) revert InsufficientFunds(fundingId, 0, amount);
+
+        // Ensure enough time has passed since the withdrawal request
+        if (block.timestamp < lastWithdrawalTimestamp[fundingId] + withdrawalDelay) {
+            revert WithdrawalTooSoon(fundingId, lastWithdrawalTimestamp[fundingId] + withdrawalDelay);
+        }
+
+        // Ensure amount does not exceed available balance
+        amount = amount > currentBalance ? currentBalance : amount;
+        if (amount == 0) revert CanNotWithdrawZeroAmount();
+
+        uint256 paymasterDeposit = entryPoint.balanceOf(address(this));
+        if (amount > paymasterDeposit) {
+            revert InsufficientFunds(address(this), paymasterDeposit, amount);
+        }
+
+        // Withdraw from EntryPoint to the user
+        entryPoint.withdrawTo(payable(fundingId), amount);
+
+        // Deduct from bookkeeping balances
+        userBalances[fundingId] -= amount;
+        withdrawalRequests[fundingId] = 0;
+
+        // **Reset lastWithdrawalTimestamp to allow future requests**
+        lastWithdrawalTimestamp[fundingId] = 0;
+
+        emit WithdrawalExecuted(fundingId, amount);
+    }
+
 
     function setFeeCollector(address newFeeCollector) external onlyOwner {
         require(newFeeCollector != address(0), "Invalid feeCollector address");
         address oldFeeCollector = feeCollector;
         feeCollector = newFeeCollector;
         emit FeeCollectorChanged(oldFeeCollector, newFeeCollector);
+    }
+
+    function getBalance(address fundingId) external view returns (uint256 balance) {
+        balance = userBalances[fundingId];
     }
 
     function getHash(PackedUserOperation calldata userOp) public view returns (bytes32) {
@@ -129,39 +160,71 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         );
     }
 
-    function _validatePaymasterUserOp(PackedUserOperation calldata _userOp, bytes32 _userOpHash, uint256 requiredPreFund)
+    function _validatePaymasterUserOp(
+        PackedUserOperation calldata _userOp,
+        bytes32 _userOpHash,
+        uint256 requiredPreFund
+    )
         internal
         override
         returns (bytes memory, uint256)
     {
-        (address fundingId, uint48 validUntil, uint48 validAfter, uint32 priceMarkup, bytes calldata signature)
-        = parsePaymasterAndData(_userOp.paymasterAndData);
+        (address fundingId, uint48 validUntil, uint48 validAfter, uint32 priceMarkup, bytes calldata signature) 
+            = parsePaymasterAndData(_userOp.paymasterAndData);
 
+        // Ensure valid signature length (64 or 65 bytes)
         if (signature.length != 64 && signature.length != 65) {
             revert PaymasterSignatureLengthInvalid();
         }
 
+        // Verify ECDSA signature
         bytes32 hash = MessageHashUtils.toEthSignedMessageHash(getHash(_userOp));
         address recoveredSigner = ECDSA.recover(hash, signature);
 
         bool isSignatureValid = signers[recoveredSigner];
         uint256 validationData = _packValidationData(!isSignatureValid, validUntil, validAfter);
 
+        // Ensure valid priceMarkup (1e6 for no markup, up to 2e6 max)
+        if (priceMarkup > 2e6 || priceMarkup < 1e6) {
+            revert InvalidPriceMarkup();
+        }
+
+        // Ensure paymaster has sufficient balance
         if (userBalances[fundingId] < requiredPreFund) {
             revert InsufficientFunds(fundingId, userBalances[fundingId], requiredPreFund);
         }
-        userBalances[fundingId] -= requiredPreFund;
-        
-        emit UserOperationSponsored(_userOpHash, _userOp.getSender());
-        return (abi.encode(fundingId, requiredPreFund, priceMarkup), validationData);
+
+        // Calculate the max penalty to ensure the paymaster doesn't underpay
+        uint256 maxPenalty = (
+            (
+                uint128(uint256(_userOp.accountGasLimits))
+                + uint128(bytes16(_userOp.paymasterAndData[PAYMASTER_POSTOP_GAS_OFFSET:PAYMASTER_DATA_OFFSET]))
+            ) * 10 * _userOp.unpackMaxFeePerGas()
+        ) / 100;
+
+        // Calculate effective cost including unaccountedGas and priceMarkup
+        uint256 effectiveCost = (
+            (requiredPreFund + (unaccountedGas * _userOp.unpackMaxFeePerGas())) * priceMarkup
+        ) / _PRICE_DENOMINATOR;
+
+        // Ensure the paymaster can cover the effective cost + max penalty
+        if (effectiveCost + maxPenalty > userBalances[fundingId]) {
+            revert InsufficientFunds(fundingId, userBalances[fundingId], effectiveCost + maxPenalty);
+        }
+
+        // Deduct the effective cost from the paymaster balance
+        userBalances[fundingId] -= (effectiveCost + maxPenalty);
+
+        // Encode the paymaster ID, price markup, and effective cost for _postOp
+        return (abi.encode(fundingId, priceMarkup, effectiveCost), validationData);
     }
+
 
     function _postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost, uint256 actualUserOpFeePerGas)
         internal
         override
     {
         (address fundingId, uint256 prechargedAmount, uint32 priceMarkup) = abi.decode(context, (address, uint256, uint32));
-
         // Include unaccountedGas since EP doesn't include this in actualGasCost
         // unaccountedGas = postOpGas + EP overhead gas 
         actualGasCost = actualGasCost + (unaccountedGas * actualUserOpFeePerGas);
