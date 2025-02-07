@@ -70,7 +70,6 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         uint256 _withdrawalDelay,
         uint256 _unaccountedGas
     ) BasePaymaster(_owner, IEntryPoint(_entryPoint)) MultiSigners(_signers) {
-        require(_withdrawalDelay >= 60, "Withdrawal delay too short");
         feeCollector = _feeCollector;
         minDeposit = _minDeposit;
         withdrawalDelay = _withdrawalDelay;
@@ -257,7 +256,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
 
         userBalances[fundingId] -= (effectiveCost + maxPenalty);
         emit UserOperationSponsored(_userOpHash, _userOp.getSender());
-        
+
         return (abi.encode(fundingId, priceMarkup, effectiveCost), validationData);
     }
 

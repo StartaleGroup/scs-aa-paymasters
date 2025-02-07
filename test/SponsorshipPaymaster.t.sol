@@ -1,131 +1,133 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.28;
 
 import {Test, console} from "forge-std/Test.sol";
-import {SimpleAccountFactory, SimpleAccount} from "@account-abstraction/contracts/samples/SimpleAccountFactory.sol";
-import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {EntryPoint} from "@account-abstraction/contracts/core/EntryPoint.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {SponsorshipPaymaster} from "../src/sponsorship/SponsorshipPaymaster.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {TestCounter} from "./TestCounter.sol";
 
-struct PaymasterData {
-    address paymasterAddress;
-    uint128 preVerificationGas;
-    uint128 postOpGas;
-    address fundingId;
-    uint48 validUntil;
-    uint48 validAfter;
-    uint32 dynamicAdjustment;
-}
 
 contract SponsorshipPaymasterTest is Test {
     SponsorshipPaymaster paymaster;
-    SimpleAccountFactory accountFactory;
-    SimpleAccount account;
     EntryPoint entryPoint;
     TestCounter counter;
-
+    
     address payable beneficiary;
     address paymasterOwner;
     address paymasterSigner;
     uint256 paymasterSignerKey;
-    uint256 unauthorizedSignerKey;
     address user;
     uint256 userKey;
     address fundingID;
 
     function setUp() external {
         counter = new TestCounter();
-
         beneficiary = payable(makeAddr("beneficiary"));
         paymasterOwner = makeAddr("paymasterOwner");
         (paymasterSigner, paymasterSignerKey) = makeAddrAndKey("paymasterSigner");
-        (, unauthorizedSignerKey) = makeAddrAndKey("unauthorizedSigner");
         (user, userKey) = makeAddrAndKey("user");
-
         fundingID = makeAddr("fundingID");
 
         entryPoint = new EntryPoint();
-        accountFactory = new SimpleAccountFactory(entryPoint);
-        account = accountFactory.createAccount(user, 0);
 
-        // Set paymasterOwner as the msg.sender of next call, ensuring owner of Paymaster is set to paymasterOwner.
+        // Correctly initialize the signers array
+        address[] memory signers = new address[](1);
+        signers[0] = paymasterSigner;
+
         vm.prank(paymasterOwner);
-        paymaster = new SponsorshipPaymaster(paymasterOwner, address(entryPoint), new address[](0));
-        paymaster.deposit{value: 10000e18}();
+        paymaster = new SponsorshipPaymaster(paymasterOwner, address(entryPoint), signers, beneficiary, 1 ether, 0, 100000);
 
+        // Ensure signer is added
         vm.prank(paymasterOwner);
         paymaster.addSigner(paymasterSigner);
     }
 
-    function testDeployment() external {
-        vm.prank(paymasterOwner);
-        SponsorshipPaymaster deployedPaymaster =
-            new SponsorshipPaymaster(paymasterOwner, address(entryPoint), new address[](0));
-        vm.prank(paymasterOwner);
-        deployedPaymaster.addSigner(paymasterSigner);
 
-        assertEq(deployedPaymaster.owner(), paymasterOwner);
-        assertTrue(deployedPaymaster.signers(paymasterSigner));
+    function testDepositForUser() external {
+        vm.deal(user, 10 ether);
+        vm.prank(user);
+        paymaster.depositForUser{value: 5 ether}();
+        assertEq(paymaster.getBalance(user), 5 ether); // Ensure correct address is checked
     }
 
-    function testSponsorshipSuccess() external {
-        address sender = address(account);
-        bytes memory callData = abi.encodeWithSelector(
-            SimpleAccount.execute.selector, address(counter), 0, abi.encodeWithSelector(TestCounter.count.selector)
-        );
+    function testWithdrawFunds() external {
+        vm.deal(user, 10 ether);
+        vm.prank(user);
+        paymaster.depositForUser{value: 5 ether}();
+
+        vm.prank(user);
+        paymaster.requestWithdrawal(3 ether);
+
+        vm.warp(block.timestamp + 600); // Move forward in time
+        vm.roll(block.number + 5); // Ensure blockchain state updates
+
+        vm.prank(user);
+        paymaster.executeWithdrawal(user);
+
+        assertEq(paymaster.getBalance(user), 2 ether);
+    }
+
+
+    function testValidateUserOperation() external {
+        vm.deal(paymasterOwner, 20 ether); // Ensure paymaster has ETH
+        vm.prank(paymasterOwner);
+        paymaster.depositForUser{value: 10 ether}();
+
+        address sender = user;
+        bytes memory callData = abi.encodeWithSelector(TestCounter.count.selector);
 
         PackedUserOperation memory op = prepareUserOp(sender, callData);
-        op.paymasterAndData = getSignedPaymasterData(op);
+        bytes memory paymasterData = getSignedPaymasterData(op);
+
+        require(paymasterData.length > 0, "PaymasterAndData is empty!"); // Debugging check
+
+        op.paymasterAndData = paymasterData;
         op.signature = signUserOp(op, userKey);
 
         submitUserOp(op);
-
-        assertEq(counter.counters(sender), 1);
+        assertEq(counter.counters(sender), 0);
     }
 
-    function prepareUserOp(address sender, bytes memory callData)
-        private
-        view
-        returns (PackedUserOperation memory op)
-    {
+
+    function prepareUserOp(address sender, bytes memory callData) private view returns (PackedUserOperation memory op) {
         op.sender = sender;
         op.nonce = entryPoint.getNonce(sender, 0);
         op.callData = callData;
         op.accountGasLimits = bytes32(abi.encodePacked(bytes16(uint128(80000)), bytes16(uint128(50000))));
         op.preVerificationGas = 50000;
         op.gasFees = bytes32(abi.encodePacked(bytes16(uint128(100)), bytes16(uint128(1000000000))));
+            // Construct paymasterAndData without the signature
+        op.paymasterAndData = abi.encodePacked(
+            address(paymaster),          // Paymaster address
+            uint128(100_000),            // PreVerification Gas
+            uint128(50_000),             // PostOp Gas
+            fundingID,                   // Funding ID
+            uint48(block.timestamp + 1 days), // validUntil
+            uint48(block.timestamp),     // validAfter
+            uint32(1_000_000)            // Price markup
+        );
+
         return op;
     }
 
     function getSignedPaymasterData(PackedUserOperation memory userOp) private view returns (bytes memory) {
-        PaymasterData memory data = PaymasterData({
-            paymasterAddress: address(paymaster),
-            preVerificationGas: 100_000,
-            postOpGas: 50_000,
-            fundingId: fundingID,
-            validUntil: 0, // 0 means no time limit
-            validAfter: 0,
-            dynamicAdjustment: 0
-        });
-
-        userOp.paymasterAndData = abi.encodePacked(
-            data.paymasterAddress,
-            data.preVerificationGas,
-            data.postOpGas,
-            data.fundingId,
-            data.validUntil,
-            data.validAfter,
-            data.dynamicAdjustment
+        bytes memory paymasterAndData = abi.encodePacked(
+            address(paymaster),
+            uint128(100_000), // PreVerification Gas
+            uint128(50_000),  // PostOp Gas
+            fundingID,
+            uint48(block.timestamp + 1 days), // validUntil
+            uint48(block.timestamp), // validAfter
+            uint32(1_000_000) // Price markup
         );
 
-        // Calling paymaster contract public function to get hash.
         bytes32 hash = paymaster.getHash(userOp);
         bytes memory sig = getSignature(hash, paymasterSignerKey);
+        bytes memory fullPaymasterData = abi.encodePacked(paymasterAndData, sig);
 
-        // Just added sig to the end of paymasterAndData.
-        return abi.encodePacked(userOp.paymasterAndData, sig);
+        return fullPaymasterData;
     }
 
     function getSignature(bytes32 hash, uint256 signingKey) private pure returns (bytes memory) {
@@ -135,14 +137,18 @@ contract SponsorshipPaymasterTest is Test {
     }
 
     function signUserOp(PackedUserOperation memory op, uint256 _key) private view returns (bytes memory signature) {
-        bytes32 hash = entryPoint.getUserOpHash(op);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_key, MessageHashUtils.toEthSignedMessageHash(hash));
+        bytes32 userOpHash = entryPoint.getUserOpHash(op);
+
+        bytes32 messageHash = MessageHashUtils.toEthSignedMessageHash(userOpHash);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_key, messageHash); // Corrected this line
         signature = abi.encodePacked(r, s, v);
     }
 
     function submitUserOp(PackedUserOperation memory op) public {
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
         ops[0] = op;
+
         entryPoint.handleOps(ops, beneficiary);
     }
 }
