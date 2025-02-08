@@ -14,7 +14,7 @@ The **Sponsorship Paymaster** contract facilitates **gas sponsorship** for **Use
 
 ### 2️⃣ Secure Paymaster Validation (`_validatePaymasterUserOp`)
 - **Parses `paymasterAndData`** to extract:
-  - **`fundingId`**: Who pays for the gas.
+  - **`sponsorAccount`**: Who pays for the gas.
   - **`validUntil` & `validAfter`**: Ensures time validity.
   - **`priceMarkup`**: Applied to gas fees.
   - **`signature`**: Validates sponsorship authorization.

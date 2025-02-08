@@ -44,7 +44,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
 
     event UserOperationSponsored(bytes32 indexed userOpHash, address indexed user);
     event DepositAdded(address indexed user, uint256 amount);
-    event GasBalanceDeducted(address indexed user, uint256 amount, uint256 premium);
+    event GasBalanceDeducted(address indexed user, uint256 amount, uint256 premium, PostOpMode mode);
     event WithdrawalRequested(address indexed user, uint256 amount);
     event WithdrawalExecuted(address indexed user, uint256 amount);
     event FeeCollectorChanged(address indexed oldFeeCollector, address indexed newFeeCollector);
@@ -52,15 +52,15 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
     event RefundProcessed(address indexed user, uint256 amount);
 
     /**
-    * @dev Initializes the SponsorshipPaymaster contract.
-    * @param _owner The owner of the paymaster.
-    * @param _entryPoint The ERC-4337 EntryPoint contract address.
-    * @param _signers Array of authorized signers for paymaster validation.
-    * @param _feeCollector Address that collects the extra fee (premium).
-    * @param _minDeposit Minimum deposit required for a user to be sponsored.
-    * @param _withdrawalDelay Delay in seconds before a user can withdraw funds.
-    * @param _unaccountedGas Extra gas used for post-operation adjustments.
-    */
+     * @dev Initializes the SponsorshipPaymaster contract.
+     * @param _owner The owner of the paymaster.
+     * @param _entryPoint The ERC-4337 EntryPoint contract address.
+     * @param _signers Array of authorized signers for paymaster validation.
+     * @param _feeCollector Address that collects the extra fee (premium).
+     * @param _minDeposit Minimum deposit required for a user to be sponsored.
+     * @param _withdrawalDelay Delay in seconds before a user can withdraw funds.
+     * @param _unaccountedGas Extra gas used for post-operation adjustments.
+     */
     constructor(
         address _owner,
         address _entryPoint,
@@ -77,10 +77,10 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
     }
 
     /**
-    * @dev Allows users to deposit ETH to be used for sponsoring gas fees.
-    * @notice The deposit is recorded in `userBalances` and also transferred to EntryPoint.
-    * @notice Requires first-time deposit to be greater than `minDeposit`.
-    */
+     * @dev Allows users to deposit ETH to be used for sponsoring gas fees.
+     * @notice The deposit is recorded in `userBalances` and also transferred to EntryPoint.
+     * @notice Requires first-time deposit to be greater than `minDeposit`.
+     */
     function depositForUser() external payable {
         if (msg.value == 0) revert LowDeposit(msg.value, minDeposit);
 
@@ -95,19 +95,19 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
     }
 
     /**
-    * @dev Allows the contract owner to set the minimum deposit required for gas sponsorship.
-    * @param newMinDeposit The new minimum deposit value.
-    */
+     * @dev Allows the contract owner to set the minimum deposit required for gas sponsorship.
+     * @param newMinDeposit The new minimum deposit value.
+     */
     function setMinDeposit(uint256 newMinDeposit) external onlyOwner {
         emit MinDepositChanged(minDeposit, newMinDeposit);
         minDeposit = newMinDeposit;
     }
 
     /**
-    * @dev Allows users to request withdrawals from their paymaster balance.
-    * @notice Ensures the user has enough balance and respects the withdrawal delay.
-    * @param amount The amount of ETH the user wishes to withdraw.
-    */
+     * @dev Allows users to request withdrawals from their paymaster balance.
+     * @notice Ensures the user has enough balance and respects the withdrawal delay.
+     * @param amount The amount of ETH the user wishes to withdraw.
+     */
     function requestWithdrawal(uint256 amount) external {
         if (userBalances[msg.sender] < amount) revert InsufficientFunds(msg.sender, userBalances[msg.sender], amount);
         if (block.timestamp <= lastWithdrawalTimestamp[msg.sender] + withdrawalDelay) {
@@ -119,27 +119,27 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
     }
 
     /**
-    * @dev Allows the owner to set a new withdrawal delay.
-    * @param newWithdrawalDelay The new withdrawal delay in seconds.
-    */
+     * @dev Allows the owner to set a new withdrawal delay.
+     * @param newWithdrawalDelay The new withdrawal delay in seconds.
+     */
     function setWithdrawalDelay(uint256 newWithdrawalDelay) external onlyOwner {
         withdrawalDelay = newWithdrawalDelay;
     }
 
     /**
-    * @dev Executes the withdrawal request for a given funding account.
-    * @notice Ensures the request was made, respects withdrawal delay, and verifies EntryPoint balance.
-    * @param fundingId The address of the user withdrawing funds.
-    */
-    function executeWithdrawal(address fundingId) external {
-        uint256 amount = withdrawalRequests[fundingId];
-        if (amount == 0) revert NoWithdrawalRequest(fundingId);
+     * @dev Executes the withdrawal request for a given funding account.
+     * @notice Ensures the request was made, respects withdrawal delay, and verifies EntryPoint balance.
+     * @param sponsorAccount The address of the user withdrawing funds.
+     */
+    function executeWithdrawal(address sponsorAccount) external {
+        uint256 amount = withdrawalRequests[sponsorAccount];
+        if (amount == 0) revert NoWithdrawalRequest(sponsorAccount);
 
-        uint256 currentBalance = userBalances[fundingId];
-        if (currentBalance == 0) revert InsufficientFunds(fundingId, 0, amount);
+        uint256 currentBalance = userBalances[sponsorAccount];
+        if (currentBalance == 0) revert InsufficientFunds(sponsorAccount, 0, amount);
 
-        if (block.timestamp < lastWithdrawalTimestamp[fundingId] + withdrawalDelay) {
-            revert WithdrawalTooSoon(fundingId, lastWithdrawalTimestamp[fundingId] + withdrawalDelay);
+        if (block.timestamp < lastWithdrawalTimestamp[sponsorAccount] + withdrawalDelay) {
+            revert WithdrawalTooSoon(sponsorAccount, lastWithdrawalTimestamp[sponsorAccount] + withdrawalDelay);
         }
 
         // Ensure amount does not exceed available balance
@@ -150,19 +150,19 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
             revert InsufficientFunds(address(this), paymasterDeposit, amount);
         }
 
-        entryPoint.withdrawTo(payable(fundingId), amount);
+        entryPoint.withdrawTo(payable(sponsorAccount), amount);
 
-        userBalances[fundingId] -= amount;
-        withdrawalRequests[fundingId] = 0;
-        lastWithdrawalTimestamp[fundingId] = 0;
+        userBalances[sponsorAccount] -= amount;
+        withdrawalRequests[sponsorAccount] = 0;
+        lastWithdrawalTimestamp[sponsorAccount] = 0;
 
-        emit WithdrawalExecuted(fundingId, amount);
+        emit WithdrawalExecuted(sponsorAccount, amount);
     }
 
     /**
-    * @dev Allows the owner to set a new fee collector address.
-    * @param newFeeCollector The new fee collector address.
-    */
+     * @dev Allows the owner to set a new fee collector address.
+     * @param newFeeCollector The new fee collector address.
+     */
     function setFeeCollector(address newFeeCollector) external onlyOwner {
         require(newFeeCollector != address(0), "Invalid feeCollector address");
         address oldFeeCollector = feeCollector;
@@ -171,19 +171,19 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
     }
 
     /**
-    * @dev Retrieves the balance of a specific funding account.
-    * @param fundingId The address of the user.
-    * @return balance The current balance of the user in the paymaster.
-    */
-    function getBalance(address fundingId) external view returns (uint256 balance) {
-        balance = userBalances[fundingId];
+     * @dev Retrieves the balance of a specific funding account.
+     * @param sponsorAccount The address of the user.
+     * @return balance The current balance of the user in the paymaster.
+     */
+    function getBalance(address sponsorAccount) external view returns (uint256 balance) {
+        balance = userBalances[sponsorAccount];
     }
 
     /**
-    * @dev Generates a hash of the given UserOperation to be signed by the paymaster.
-    * @param userOp The UserOperation structure.
-    * @return The hashed UserOperation data.
-    */
+     * @dev Generates a hash of the given UserOperation to be signed by the paymaster.
+     * @param userOp The UserOperation structure.
+     * @return The hashed UserOperation data.
+     */
     function getHash(PackedUserOperation calldata userOp) public view returns (bytes32) {
         return keccak256(
             abi.encode(
@@ -203,18 +203,18 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
     }
 
     /**
-    * @dev Validates the UserOperation and deducts the required gas sponsorship amount.
-    * @param _userOp The UserOperation being validated.
-    * @param _userOpHash The hash of the UserOperation.
-    * @param requiredPreFund The required ETH for the UserOperation.
-    * @return Encoded context for post-operation handling and validationData for EntryPoint.
-    */
+     * @dev Validates the UserOperation and deducts the required gas sponsorship amount.
+     * @param _userOp The UserOperation being validated.
+     * @param _userOpHash The hash of the UserOperation.
+     * @param requiredPreFund The required ETH for the UserOperation.
+     * @return Encoded context for post-operation handling and validationData for EntryPoint.
+     */
     function _validatePaymasterUserOp(
         PackedUserOperation calldata _userOp,
         bytes32 _userOpHash,
         uint256 requiredPreFund
     ) internal override returns (bytes memory, uint256) {
-        (address fundingId, uint48 validUntil, uint48 validAfter, uint32 priceMarkup, bytes calldata signature) =
+        (address sponsorAccount, uint48 validUntil, uint48 validAfter, uint32 priceMarkup, bytes calldata signature) =
             parsePaymasterAndData(_userOp.paymasterAndData);
 
         if (signature.length != 64 && signature.length != 65) {
@@ -250,29 +250,29 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
             ((requiredPreFund + (unaccountedGas * _userOp.unpackMaxFeePerGas())) * priceMarkup) / _PRICE_DENOMINATOR;
 
         // Ensure the paymaster can cover the effective cost + max penalty
-        if (effectiveCost + maxPenalty > userBalances[fundingId]) {
-            revert InsufficientFunds(fundingId, userBalances[fundingId], effectiveCost + maxPenalty);
+        if (effectiveCost + maxPenalty > userBalances[sponsorAccount]) {
+            revert InsufficientFunds(sponsorAccount, userBalances[sponsorAccount], effectiveCost + maxPenalty);
         }
 
-        userBalances[fundingId] -= (effectiveCost + maxPenalty);
+        userBalances[sponsorAccount] -= (effectiveCost + maxPenalty);
         emit UserOperationSponsored(_userOpHash, _userOp.getSender());
 
-        return (abi.encode(fundingId, priceMarkup, effectiveCost), validationData);
+        return (abi.encode(sponsorAccount, priceMarkup, effectiveCost), validationData);
     }
 
     /**
-    * @dev Handles the post-operation logic after transaction execution.
-    * @notice Adjusts gas costs, refunds excess gas, and ensures sufficient paymaster balance.
-    * @param mode The PostOpMode (OpSucceeded, OpReverted, or PostOpReverted).
-    * @param context Encoded context passed from `_validatePaymasterUserOp`.
-    * @param actualGasCost The actual gas cost incurred.
-    * @param actualUserOpFeePerGas The effective gas price used for calculation.
-    */
+     * @dev Handles the post-operation logic after transaction execution.
+     * @notice Adjusts gas costs, refunds excess gas, and ensures sufficient paymaster balance.
+     * @param mode The PostOpMode (OpSucceeded, OpReverted, or PostOpReverted).
+     * @param context Encoded context passed from `_validatePaymasterUserOp`.
+     * @param actualGasCost The actual gas cost incurred.
+     * @param actualUserOpFeePerGas The effective gas price used for calculation.
+     */
     function _postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost, uint256 actualUserOpFeePerGas)
         internal
         override
     {
-        (address fundingId, uint32 priceMarkup, uint256 prechargedAmount) =
+        (address sponsorAccount, uint32 priceMarkup, uint256 prechargedAmount) =
             abi.decode(context, (address, uint32, uint256));
         // Include unaccountedGas since EP doesn't include this in actualGasCost
         // unaccountedGas = postOpGas + EP overhead gas
@@ -285,35 +285,41 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         if (prechargedAmount > adjustedGasCost) {
             // Refund excess gas fees
             uint256 refund = prechargedAmount - adjustedGasCost;
-            userBalances[fundingId] += refund;
-            emit RefundProcessed(fundingId, refund);
+            userBalances[sponsorAccount] += refund;
+            emit RefundProcessed(sponsorAccount, refund);
         } else {
             // Handle undercharge scenario
             uint256 deduction = adjustedGasCost - prechargedAmount;
-            userBalances[fundingId] -= deduction;
+            userBalances[sponsorAccount] -= deduction;
         }
 
-        emit GasBalanceDeducted(fundingId, actualGasCost, premium);
+        emit GasBalanceDeducted(sponsorAccount, actualGasCost, premium, mode);
     }
 
     /**
-    * @dev Parses the paymaster data to extract relevant information.
-    * @param _paymasterAndData The encoded paymaster data. 
+     * @dev Parses the paymaster data to extract relevant information.
+     * @param _paymasterAndData The encoded paymaster data.
      * paymasterAndData[:20]   : address(this)
      * paymasterAndData[20:36] : paymaster validation gas
      * paymasterAndData[36:52] : paymaster post-op gas
-     * paymasterAndData[52:72] : fundingId
+     * paymasterAndData[52:72] : sponsorAccount
      * paymasterAndData[72:84] : abi.packedEncode(validUntil, validAfter) - uint48 (6bytes length) for each
      * paymasterAndData[84:88] : dynamicAdjustment
      * paymasterAndData[88:]   : signature
-    */
+     */
     function parsePaymasterAndData(bytes calldata _paymasterAndData)
         public
         pure
-        returns (address fundingId, uint48 validUntil, uint48 validAfter, uint32 priceMarkup, bytes calldata signature)
+        returns (
+            address sponsorAccount,
+            uint48 validUntil,
+            uint48 validAfter,
+            uint32 priceMarkup,
+            bytes calldata signature
+        )
     {
         require(_paymasterAndData.length > SIGNATURE_OFFSET, "Invalid paymasterAndData length");
-        fundingId = address(bytes20(_paymasterAndData[FUNDING_ID_OFFSET:VALID_UNTIL_TIMESTAMP_OFFSET]));
+        sponsorAccount = address(bytes20(_paymasterAndData[FUNDING_ID_OFFSET:VALID_UNTIL_TIMESTAMP_OFFSET]));
         validUntil = uint48(bytes6(_paymasterAndData[VALID_UNTIL_TIMESTAMP_OFFSET:VALID_AFTER_TIMESTAMP_OFFSET]));
         validAfter = uint48(bytes6(_paymasterAndData[VALID_AFTER_TIMESTAMP_OFFSET:PRICE_MARKUP_OFFSET]));
         priceMarkup = uint32(bytes4(_paymasterAndData[PRICE_MARKUP_OFFSET:SIGNATURE_OFFSET]));
@@ -321,25 +327,25 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
     }
 
     /**
-    * @dev Overrides default deposit function to prevent direct deposits.
-    */
+     * @dev Overrides default deposit function to prevent direct deposits.
+     */
     function deposit() external payable virtual override {
         revert UseDepositForInstead();
     }
 
     /**
-    * @dev Overrides default withdraw function to enforce request-based withdrawal.
-    */
+     * @dev Overrides default withdraw function to enforce request-based withdrawal.
+     */
     function withdrawTo(address payable withdrawAddress, uint256 amount) external virtual override {
         (withdrawAddress, amount);
         revert SubmitRequestInstead();
     }
 
     /**
-    * @dev Allows the owner to set the extra gas used in post-op calculations.
-    * @notice Ensures the value does not exceed `_UNACCOUNTED_GAS_LIMIT`.
-    * @param value The new unaccounted gas value.
-    */
+     * @dev Allows the owner to set the extra gas used in post-op calculations.
+     * @notice Ensures the value does not exceed `_UNACCOUNTED_GAS_LIMIT`.
+     * @param value The new unaccounted gas value.
+     */
     function setUnaccountedGas(uint256 value) external payable onlyOwner {
         if (value > _UNACCOUNTED_GAS_LIMIT) {
             revert UnaccountedGasTooHigh();

@@ -1,6 +1,6 @@
 import { equal } from "assert";
 import { createPublicClient, createWalletClient, type PrivateKeyAccount, encodePacked, toBytes, fromHex, http, type PublicClient, type WalletClient, parseEther, encodeFunctionData, type Address, type Hex } from 'viem';
-import { type BundlerClient, createBundlerClient, toPackedUserOperation, type UserOperation} from 'viem/account-abstraction';
+import { type BundlerClient, createBundlerClient, toPackedUserOperation, type UserOperation } from 'viem/account-abstraction';
 import { localhost } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { toSimpleSmartAccount } from "permissionless/accounts";
@@ -24,7 +24,7 @@ const DUMMY_PAYMASTER_POST_OP_GAS_LIIMIT = BigInt(46908);
 
 function getPaymasterData(validUntil: number, validAfter: number) {
   const data = {
-    fundingId: MOCK_FUNDING_ID,
+    sponsorAccount: MOCK_FUNDING_ID,
     validUntil,
     validAfter,
     dynamicAdjustment: MOCK_DYNAMIC_ADJUSTMENT,
@@ -32,7 +32,7 @@ function getPaymasterData(validUntil: number, validAfter: number) {
 
   return encodePacked(
     ['address', 'uint48', 'uint48', 'uint32'],
-    [data.fundingId, data.validUntil, data.validAfter, data.dynamicAdjustment],
+    [data.sponsorAccount, data.validUntil, data.validAfter, data.dynamicAdjustment],
   )
 }
 
@@ -57,7 +57,7 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
   let paymasterOwnerPrivateKey: Hex;
   let paymasterOwnerAccount: PrivateKeyAccount;
 
-  async function fillPaymasterDataSignature(userOperation: UserOperation) : Promise<UserOperation> {
+  async function fillPaymasterDataSignature(userOperation: UserOperation): Promise<UserOperation> {
     const hash = await publicClient.readContract({
       address: paymasterAddress,
       abi: sponsorshipPaymasterAbi,
@@ -157,7 +157,7 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
           "address", // paymaster
           "uint128", // paymasterVerificationGasLimit
           "uint128", // paymasterPostOpGasLimit
-          "address", // fundingId
+          "address", // sponsorAccount
           "uint48", // validUntil
           "uint48", // validAfter
           "uint32", // dynamicAdjustment
@@ -205,7 +205,7 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
       })
 
       // Hold pre user operation data
-      const preAccountBalance = await publicClient.getBalance({address: simpleAccount.address});
+      const preAccountBalance = await publicClient.getBalance({ address: simpleAccount.address });
       const preCounterValue = await publicClient.call({
         to: counterAddress,
         data: encodeFunctionData({
@@ -260,17 +260,17 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
 
       // Send User Operation
       // @ts-ignore
-      const userOpHash = await bundlerClient.sendUserOperation({ 
+      const userOpHash = await bundlerClient.sendUserOperation({
         ...userOp,
         signature: null // don't use previous account signature, need to sign inside `sendUserOperation` again
       });
 
-      await bundlerClient.waitForUserOperationReceipt({ 
+      await bundlerClient.waitForUserOperationReceipt({
         hash: userOpHash,
       })
 
       // Check account balance not changed
-      const postAccountBalance = await publicClient.getBalance({address: simpleAccount.address});
+      const postAccountBalance = await publicClient.getBalance({ address: simpleAccount.address });
       equal(postAccountBalance, preAccountBalance);
 
       // Check counter value incremented
