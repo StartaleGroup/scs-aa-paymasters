@@ -110,9 +110,12 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
      */
     function requestWithdrawal(uint256 amount) external {
         if (userBalances[msg.sender] < amount) revert InsufficientFunds(msg.sender, userBalances[msg.sender], amount);
-        if (block.timestamp <= lastWithdrawalTimestamp[msg.sender] + withdrawalDelay) {
+
+        // Apply delay check only if there's a previous withdrawal timestamp
+        if (lastWithdrawalTimestamp[msg.sender] > 0 && block.timestamp < lastWithdrawalTimestamp[msg.sender] + withdrawalDelay) {
             revert WithdrawalTooSoon(msg.sender, lastWithdrawalTimestamp[msg.sender] + withdrawalDelay);
         }
+
         withdrawalRequests[msg.sender] = amount;
         lastWithdrawalTimestamp[msg.sender] = block.timestamp;
         emit WithdrawalRequested(msg.sender, amount);
@@ -133,11 +136,13 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
      */
     function executeWithdrawal(address sponsorAccount) external {
         uint256 amount = withdrawalRequests[sponsorAccount];
-        if (amount == 0) revert NoWithdrawalRequest(sponsorAccount);
+
+        if (amount == 0) revert NoWithdrawalRequest(sponsorAccount); // Fixed check
 
         uint256 currentBalance = userBalances[sponsorAccount];
         if (currentBalance == 0) revert InsufficientFunds(sponsorAccount, 0, amount);
 
+        // Check delay only if previous withdrawal exists
         if (block.timestamp < lastWithdrawalTimestamp[sponsorAccount] + withdrawalDelay) {
             revert WithdrawalTooSoon(sponsorAccount, lastWithdrawalTimestamp[sponsorAccount] + withdrawalDelay);
         }
@@ -153,8 +158,8 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         entryPoint.withdrawTo(payable(sponsorAccount), amount);
 
         userBalances[sponsorAccount] -= amount;
-        withdrawalRequests[sponsorAccount] = 0;
-        lastWithdrawalTimestamp[sponsorAccount] = 0;
+        delete withdrawalRequests[sponsorAccount];
+        delete lastWithdrawalTimestamp[sponsorAccount];
 
         emit WithdrawalExecuted(sponsorAccount, amount);
     }
