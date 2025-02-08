@@ -1,87 +1,206 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.28;
 
 import {Test, console} from "forge-std/Test.sol";
-import {SimpleAccountFactory, SimpleAccount} from "@account-abstraction/contracts/samples/SimpleAccountFactory.sol";
-import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {EntryPoint} from "@account-abstraction/contracts/core/EntryPoint.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {SponsorshipPaymaster} from "../src/sponsorship/SponsorshipPaymaster.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {TestCounter} from "./TestCounter.sol";
-
-struct PaymasterData {
-    address paymasterAddress;
-    uint128 preVerificationGas;
-    uint128 postOpGas;
-    address fundingId;
-    uint48 validUntil;
-    uint48 validAfter;
-    uint32 dynamicAdjustment;
-}
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {SimpleAccountFactory, SimpleAccount} from "@account-abstraction/contracts/samples/SimpleAccountFactory.sol";
 
 contract SponsorshipPaymasterTest is Test {
     SponsorshipPaymaster paymaster;
-    SimpleAccountFactory accountFactory;
-    SimpleAccount account;
     EntryPoint entryPoint;
     TestCounter counter;
+    SimpleAccountFactory accountFactory;
+    SimpleAccount account;
 
     address payable beneficiary;
     address paymasterOwner;
     address paymasterSigner;
     uint256 paymasterSignerKey;
-    uint256 unauthorizedSignerKey;
     address user;
     uint256 userKey;
-    address fundingID;
+    address sponsorAccount;
+    uint256 constant WITHDRAWAL_DELAY = 10;
+
+    modifier prankModifier(address sender) {
+        vm.prank(sender);
+        _;
+    }
+
+    struct PaymasterData {
+        address paymasterAddress;
+        uint128 preVerificationGas;
+        uint128 postOpGas;
+        address sponsorAccount;
+        uint48 validUntil;
+        uint48 validAfter;
+        uint32 dynamicAdjustment;
+    }
 
     function setUp() external {
         counter = new TestCounter();
-
         beneficiary = payable(makeAddr("beneficiary"));
         paymasterOwner = makeAddr("paymasterOwner");
         (paymasterSigner, paymasterSignerKey) = makeAddrAndKey("paymasterSigner");
-        (, unauthorizedSignerKey) = makeAddrAndKey("unauthorizedSigner");
         (user, userKey) = makeAddrAndKey("user");
-
-        fundingID = makeAddr("fundingID");
+        sponsorAccount = makeAddr("sponsorAccount");
 
         entryPoint = new EntryPoint();
         accountFactory = new SimpleAccountFactory(entryPoint);
         account = accountFactory.createAccount(user, 0);
 
-        // Set paymasterOwner as the msg.sender of next call, ensuring owner of Paymaster is set to paymasterOwner.
+        address[] memory signers = new address[](1);
+        signers[0] = paymasterSigner;
+
         vm.prank(paymasterOwner);
-        paymaster = new SponsorshipPaymaster(paymasterOwner, address(entryPoint), new address[](0));
-        paymaster.deposit{value: 10000e18}();
+        paymaster = new SponsorshipPaymaster(
+            paymasterOwner, address(entryPoint), signers, beneficiary, 1 ether, WITHDRAWAL_DELAY, 100000
+        );
 
         vm.prank(paymasterOwner);
         paymaster.addSigner(paymasterSigner);
+        vm.deal(sponsorAccount, 10 ether);
     }
 
-    function testDeployment() external {
-        vm.prank(paymasterOwner);
-        SponsorshipPaymaster deployedPaymaster =
-            new SponsorshipPaymaster(paymasterOwner, address(entryPoint), new address[](0));
-        vm.prank(paymasterOwner);
-        deployedPaymaster.addSigner(paymasterSigner);
+    function test_DepositForUser() external {
+        uint256 depositAmount = 10 ether;
+        vm.prank(sponsorAccount);
+        paymaster.depositForUser{value: depositAmount}();
 
-        assertEq(deployedPaymaster.owner(), paymasterOwner);
-        assertTrue(deployedPaymaster.signers(paymasterSigner));
+        assertEq(paymaster.getBalance(sponsorAccount), depositAmount);
+    }
+
+    function test_RevertIf_DepositForUserZero() external {
+        // Expect `LowDeposit(0, minDeposit)` custom error with correct parameters
+        vm.expectRevert(abi.encodeWithSelector(SponsorshipPaymaster.LowDeposit.selector, 0, 1 ether));
+        vm.prank(sponsorAccount);
+        paymaster.depositForUser{value: 0}();
+    }
+
+    function test_RequestWithdrawal() external {
+        uint256 depositAmount = 5 ether;
+        vm.prank(sponsorAccount);
+        paymaster.depositForUser{value: depositAmount}();
+
+        vm.prank(sponsorAccount);
+        paymaster.requestWithdrawal(3 ether);
+
+        assertEq(paymaster.withdrawalRequests(sponsorAccount), 3 ether);
+        assertEq(paymaster.lastWithdrawalTimestamp(sponsorAccount), block.timestamp);
+    }
+
+    function test_RevertIf_ExecuteWithdrawalWithNoRequest() external {
+        // Expect `NoWithdrawalRequest` custom error with the user's address as parameter
+        vm.expectRevert(abi.encodeWithSelector(SponsorshipPaymaster.NoWithdrawalRequest.selector, sponsorAccount));
+        vm.prank(sponsorAccount);
+        paymaster.executeWithdrawal(sponsorAccount);
+    }
+
+    function test_RevertIf_RequestWithdrawalTooSoon() external {
+        uint256 depositAmount = 5 ether;
+        uint256 withdrawalAmount = 3 ether;
+        uint256 withdrawalDelay = 10;
+
+        // Set withdrawal delay in the contract
+        vm.prank(paymasterOwner);
+        paymaster.setWithdrawalDelay(withdrawalDelay);
+
+        // Sponsor deposits funds
+        vm.prank(sponsorAccount);
+        paymaster.depositForUser{value: depositAmount}();
+
+        assertEq(paymaster.getBalance(sponsorAccount), depositAmount);
+
+        // Sponsor requests withdrawal
+        vm.prank(sponsorAccount);
+        paymaster.requestWithdrawal(withdrawalAmount);
+
+        // Ensure withdrawal request is set
+        assertEq(paymaster.withdrawalRequests(sponsorAccount), withdrawalAmount);
+        uint256 requestTime = block.timestamp;
+        assertEq(paymaster.lastWithdrawalTimestamp(sponsorAccount), requestTime);
+
+        // Attempt to withdraw too soon
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SponsorshipPaymaster.WithdrawalTooSoon.selector, sponsorAccount, requestTime + withdrawalDelay
+            )
+        );
+
+        vm.prank(sponsorAccount);
+        paymaster.executeWithdrawal(sponsorAccount);
+    }
+
+    function testExecuteWithdrawal() external {
+        uint256 depositAmount = 5 ether;
+        uint256 withdrawalAmount = 3 ether;
+        uint256 withdrawalDelay = 10;
+        // Sponsor deposits funds
+        vm.prank(sponsorAccount);
+        paymaster.depositForUser{value: depositAmount}();
+
+        assertEq(paymaster.getBalance(sponsorAccount), depositAmount); // Ensure deposit success
+        // Sponsor requests withdrawal
+        vm.prank(sponsorAccount);
+        paymaster.requestWithdrawal(withdrawalAmount);
+        assertEq(paymaster.withdrawalRequests(sponsorAccount), 3 ether); // Ensure withdrawal request is set
+        assertEq(paymaster.lastWithdrawalTimestamp(sponsorAccount), block.timestamp); // Ensure withdrawal timestamp is set
+
+        vm.warp(block.timestamp + withdrawalDelay + 200);
+
+        uint256 sponsorBalanceBefore = sponsorAccount.balance;
+
+        // Execute withdrawal
+        vm.prank(sponsorAccount);
+        paymaster.executeWithdrawal(sponsorAccount);
+
+        // Ensure withdrawal request is cleared
+        assertEq(paymaster.withdrawalRequests(sponsorAccount), 0);
+
+        // Ensure withdrawal timestamp is cleared
+        assertEq(paymaster.lastWithdrawalTimestamp(sponsorAccount), 0);
+
+        // Ensure user's balance is reduced
+        assertEq(paymaster.getBalance(sponsorAccount), depositAmount - withdrawalAmount);
+
+        // Ensure funds were received by sponsor
+        assertEq(sponsorAccount.balance, sponsorBalanceBefore + withdrawalAmount);
+    }
+
+    function test_SetUnaccountedGas() external prankModifier(paymasterOwner) {
+        uint256 newUnaccountedGas = 80_000;
+        paymaster.setUnaccountedGas(newUnaccountedGas);
+        assertEq(paymaster.unaccountedGas(), newUnaccountedGas);
+    }
+
+    function test_RevertIf_SetUnaccountedGasTooHigh() external prankModifier(paymasterOwner) {
+        vm.expectRevert(SponsorshipPaymaster.UnaccountedGasTooHigh.selector);
+        paymaster.setUnaccountedGas(200_000);
     }
 
     function testSponsorshipSuccess() external {
+        vm.prank(sponsorAccount);
+        paymaster.depositForUser{value: 10 ether}();
+
         address sender = address(account);
         bytes memory callData = abi.encodeWithSelector(
             SimpleAccount.execute.selector, address(counter), 0, abi.encodeWithSelector(TestCounter.count.selector)
         );
 
+        // Prepare user operation
         PackedUserOperation memory op = prepareUserOp(sender, callData);
-        op.paymasterAndData = getSignedPaymasterData(op);
+        // Get signed paymaster data
+        bytes memory paymasterData = getSignedPaymasterData(op);
+        // Set paymaster data
+        op.paymasterAndData = paymasterData;
+        // Sign user operation
         op.signature = signUserOp(op, userKey);
 
         submitUserOp(op);
-
         assertEq(counter.counters(sender), 1);
     }
 
@@ -96,6 +215,7 @@ contract SponsorshipPaymasterTest is Test {
         op.accountGasLimits = bytes32(abi.encodePacked(bytes16(uint128(80000)), bytes16(uint128(50000))));
         op.preVerificationGas = 50000;
         op.gasFees = bytes32(abi.encodePacked(bytes16(uint128(100)), bytes16(uint128(1000000000))));
+
         return op;
     }
 
@@ -104,23 +224,23 @@ contract SponsorshipPaymasterTest is Test {
             paymasterAddress: address(paymaster),
             preVerificationGas: 100_000,
             postOpGas: 50_000,
-            fundingId: fundingID,
+            sponsorAccount: sponsorAccount,
             validUntil: 0, // 0 means no time limit
             validAfter: 0,
-            dynamicAdjustment: 0
+            dynamicAdjustment: 1000_000
         });
 
         userOp.paymasterAndData = abi.encodePacked(
             data.paymasterAddress,
             data.preVerificationGas,
             data.postOpGas,
-            data.fundingId,
+            data.sponsorAccount,
             data.validUntil,
             data.validAfter,
             data.dynamicAdjustment
         );
 
-        // Calling paymaster contract public function to get hash.
+        // Get hash of paymaster data
         bytes32 hash = paymaster.getHash(userOp);
         bytes memory sig = getSignature(hash, paymasterSignerKey);
 
@@ -142,6 +262,7 @@ contract SponsorshipPaymasterTest is Test {
 
     function submitUserOp(PackedUserOperation memory op) public {
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+
         ops[0] = op;
         entryPoint.handleOps(ops, beneficiary);
     }

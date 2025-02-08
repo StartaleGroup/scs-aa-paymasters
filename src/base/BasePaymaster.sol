@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.23;
-
-/* solhint-disable reason-string */
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
@@ -85,14 +83,13 @@ abstract contract BasePaymaster is IPaymaster, Ownable {
         virtual
     {
         (mode, context, actualGasCost, actualUserOpFeePerGas); // unused params
-        // subclass must override this method if validatePaymasterUserOp returns a context
-        revert("must override");
+        revert("BasePaymaster: _postOp must be overridden");
     }
 
     /**
      * Add a deposit for this paymaster, used for paying for transaction fees.
      */
-    function deposit() public payable {
+    function deposit() external payable virtual {
         entryPoint.depositTo{value: msg.value}(address(this));
     }
 
@@ -101,7 +98,7 @@ abstract contract BasePaymaster is IPaymaster, Ownable {
      * @param withdrawAddress - Target to send to.
      * @param amount          - Amount to withdraw.
      */
-    function withdrawTo(address payable withdrawAddress, uint256 amount) public onlyOwner {
+    function withdrawTo(address payable withdrawAddress, uint256 amount) external virtual onlyOwner {
         entryPoint.withdrawTo(withdrawAddress, amount);
     }
 
@@ -142,6 +139,6 @@ abstract contract BasePaymaster is IPaymaster, Ownable {
      * Validate the call is made from a valid entrypoint
      */
     function _requireFromEntryPoint() internal virtual {
-        require(msg.sender == address(entryPoint), "Sender not EntryPoint");
+        require(msg.sender == address(entryPoint), "Caller is not EntryPoint");
     }
 }
