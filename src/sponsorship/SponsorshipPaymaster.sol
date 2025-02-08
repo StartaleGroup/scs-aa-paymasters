@@ -112,7 +112,10 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         if (userBalances[msg.sender] < amount) revert InsufficientFunds(msg.sender, userBalances[msg.sender], amount);
 
         // Apply delay check only if there's a previous withdrawal timestamp
-        if (lastWithdrawalTimestamp[msg.sender] > 0 && block.timestamp < lastWithdrawalTimestamp[msg.sender] + withdrawalDelay) {
+        if (
+            lastWithdrawalTimestamp[msg.sender] > 0
+                && block.timestamp < lastWithdrawalTimestamp[msg.sender] + withdrawalDelay
+        ) {
             revert WithdrawalTooSoon(msg.sender, lastWithdrawalTimestamp[msg.sender] + withdrawalDelay);
         }
 

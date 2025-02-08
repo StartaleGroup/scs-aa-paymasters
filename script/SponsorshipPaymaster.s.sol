@@ -42,13 +42,7 @@ contract DeploySponsorshipPaymaster is Script {
     ) public {
         vm.startBroadcast();
         SponsorshipPaymaster pm = new SponsorshipPaymaster{salt: bytes32(_salt)}(
-            _owner,
-            entryPoint,
-            _signers,
-            _feeCollector,
-            _minDeposit,
-            _withdrawalDelay,
-            _unaccountedGas
+            _owner, entryPoint, _signers, _feeCollector, _minDeposit, _withdrawalDelay, _unaccountedGas
         );
         console.log("Sponsorship Paymaster Contract deployed at ", address(pm));
         vm.stopBroadcast();

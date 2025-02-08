@@ -24,7 +24,6 @@ abstract contract BasePaymaster is IPaymaster, Ownable {
         entryPoint = _entryPoint;
     }
 
-
     //sanity check: make sure this EntryPoint was compiled against the same
     // IEntryPoint of this paymaster
     function _validateEntryPointInterface(IEntryPoint _entryPoint) internal virtual {
@@ -63,7 +62,6 @@ abstract contract BasePaymaster is IPaymaster, Ownable {
         _requireFromEntryPoint();
         _postOp(mode, context, actualGasCost, actualUserOpFeePerGas);
     }
-
 
     /**
      * Post-operation handler.
@@ -120,7 +118,7 @@ abstract contract BasePaymaster is IPaymaster, Ownable {
         return entryPoint.balanceOf(address(this));
     }
 
-   /**
+    /**
      * Unlock the stake, in order to withdraw it.
      * The paymaster can't serve requests once unlocked, until it calls addStake again
      */

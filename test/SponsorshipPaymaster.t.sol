@@ -10,7 +10,6 @@ import {TestCounter} from "./TestCounter.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {SimpleAccountFactory, SimpleAccount} from "@account-abstraction/contracts/samples/SimpleAccountFactory.sol";
 
-
 contract SponsorshipPaymasterTest is Test {
     SponsorshipPaymaster paymaster;
     EntryPoint entryPoint;
@@ -58,8 +57,9 @@ contract SponsorshipPaymasterTest is Test {
         signers[0] = paymasterSigner;
 
         vm.prank(paymasterOwner);
-        paymaster =
-            new SponsorshipPaymaster(paymasterOwner, address(entryPoint), signers, beneficiary, 1 ether, WITHDRAWAL_DELAY, 100000);
+        paymaster = new SponsorshipPaymaster(
+            paymasterOwner, address(entryPoint), signers, beneficiary, 1 ether, WITHDRAWAL_DELAY, 100000
+        );
 
         vm.prank(paymasterOwner);
         paymaster.addSigner(paymasterSigner);
@@ -69,7 +69,7 @@ contract SponsorshipPaymasterTest is Test {
     function test_DepositForUser() external {
         uint256 depositAmount = 10 ether;
         vm.prank(sponsorAccount);
-        paymaster.depositForUser{ value: depositAmount }();
+        paymaster.depositForUser{value: depositAmount}();
 
         assertEq(paymaster.getBalance(sponsorAccount), depositAmount);
     }
@@ -78,13 +78,13 @@ contract SponsorshipPaymasterTest is Test {
         // Expect `LowDeposit(0, minDeposit)` custom error with correct parameters
         vm.expectRevert(abi.encodeWithSelector(SponsorshipPaymaster.LowDeposit.selector, 0, 1 ether));
         vm.prank(sponsorAccount);
-        paymaster.depositForUser{ value: 0 }();
+        paymaster.depositForUser{value: 0}();
     }
 
     function test_RequestWithdrawal() external {
         uint256 depositAmount = 5 ether;
         vm.prank(sponsorAccount);
-        paymaster.depositForUser{ value: depositAmount }();
+        paymaster.depositForUser{value: depositAmount}();
 
         vm.prank(sponsorAccount);
         paymaster.requestWithdrawal(3 ether);
@@ -107,11 +107,11 @@ contract SponsorshipPaymasterTest is Test {
 
         // Set withdrawal delay in the contract
         vm.prank(paymasterOwner);
-        paymaster.setWithdrawalDelay(withdrawalDelay); 
+        paymaster.setWithdrawalDelay(withdrawalDelay);
 
         // Sponsor deposits funds
         vm.prank(sponsorAccount);
-        paymaster.depositForUser{ value: depositAmount }();
+        paymaster.depositForUser{value: depositAmount}();
 
         assertEq(paymaster.getBalance(sponsorAccount), depositAmount);
 
@@ -125,12 +125,15 @@ contract SponsorshipPaymasterTest is Test {
         assertEq(paymaster.lastWithdrawalTimestamp(sponsorAccount), requestTime);
 
         // Attempt to withdraw too soon
-        vm.expectRevert(abi.encodeWithSelector(SponsorshipPaymaster.WithdrawalTooSoon.selector, sponsorAccount, requestTime + withdrawalDelay));
-        
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SponsorshipPaymaster.WithdrawalTooSoon.selector, sponsorAccount, requestTime + withdrawalDelay
+            )
+        );
+
         vm.prank(sponsorAccount);
         paymaster.executeWithdrawal(sponsorAccount);
     }
-
 
     function testExecuteWithdrawal() external {
         uint256 depositAmount = 5 ether;
@@ -138,15 +141,15 @@ contract SponsorshipPaymasterTest is Test {
         uint256 withdrawalDelay = 10;
         // Sponsor deposits funds
         vm.prank(sponsorAccount);
-        paymaster.depositForUser{ value: depositAmount }();
-        
+        paymaster.depositForUser{value: depositAmount}();
+
         assertEq(paymaster.getBalance(sponsorAccount), depositAmount); // Ensure deposit success
         // Sponsor requests withdrawal
         vm.prank(sponsorAccount);
         paymaster.requestWithdrawal(withdrawalAmount);
         assertEq(paymaster.withdrawalRequests(sponsorAccount), 3 ether); // Ensure withdrawal request is set
         assertEq(paymaster.lastWithdrawalTimestamp(sponsorAccount), block.timestamp); // Ensure withdrawal timestamp is set
-        
+
         vm.warp(block.timestamp + withdrawalDelay + 200);
 
         uint256 sponsorBalanceBefore = sponsorAccount.balance;
@@ -160,7 +163,7 @@ contract SponsorshipPaymasterTest is Test {
 
         // Ensure withdrawal timestamp is cleared
         assertEq(paymaster.lastWithdrawalTimestamp(sponsorAccount), 0);
-        
+
         // Ensure user's balance is reduced
         assertEq(paymaster.getBalance(sponsorAccount), depositAmount - withdrawalAmount);
 
@@ -181,7 +184,7 @@ contract SponsorshipPaymasterTest is Test {
 
     function testSponsorshipSuccess() external {
         vm.prank(sponsorAccount);
-        paymaster.depositForUser{ value: 10 ether }();
+        paymaster.depositForUser{value: 10 ether}();
 
         address sender = address(account);
         bytes memory callData = abi.encodeWithSelector(
@@ -250,7 +253,6 @@ contract SponsorshipPaymasterTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signingKey, digest);
         return abi.encodePacked(r, s, v);
     }
-
 
     function signUserOp(PackedUserOperation memory op, uint256 _key) private view returns (bytes memory signature) {
         bytes32 hash = entryPoint.getUserOpHash(op);
