@@ -11,12 +11,12 @@ interface ISponsorshipPaymaster is ISponsorshipPaymasterEventsAndErrors {
         address to;
         uint256 requestSubmittedTimestamp;
     }
-    
+
     function depositFor(address sponsorAccount) external payable;
 
     // addSigner
     function addSigner(address signer) external payable;
-    
+
     // removeSigner
     function removeSigner(address signer) external payable;
 
