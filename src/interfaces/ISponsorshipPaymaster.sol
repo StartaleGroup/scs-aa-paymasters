@@ -6,11 +6,17 @@ import {PackedUserOperation} from "@account-abstraction/contracts/core/UserOpera
 import {ISponsorshipPaymasterEventsAndErrors} from "./ISponsorshipPaymasterEventsAndErrors.sol";
 
 interface ISponsorshipPaymaster is ISponsorshipPaymasterEventsAndErrors {
-    // function depositFor(address fundingId) external payable;
+    struct WithdrawalRequest {
+        uint256 amount;
+        address to;
+        uint256 requestSubmittedTimestamp;
+    }
+    // function depositFor(address sponsorAccount) external payable;
+
     function depositForUser() external payable;
 
-    // Review: Note previously this was done by addSigner of MultiSigner
-    // function setSigner(address newVerifyingSigner) external payable;
+    // addSigner
+    // removeSigner
 
     function setFeeCollector(address newFeeCollector) external payable;
 
@@ -21,24 +27,24 @@ interface ISponsorshipPaymaster is ISponsorshipPaymasterEventsAndErrors {
 
     // function withdrawEth(address payable recipient, uint256 amount) external payable;
 
-    function getBalance(address fundingId) external view returns (uint256 balance);
+    function getBalance(address sponsorAccount) external view returns (uint256 balance);
 
     function getHash(
         PackedUserOperation calldata userOp,
-        address fundingId,
+        address sponsorAccount,
         uint48 validUntil,
         uint48 validAfter,
-        uint32 priceMarkup
+        uint32 feeMarkup
     ) external view returns (bytes32);
 
     function parsePaymasterAndData(bytes calldata paymasterAndData)
         external
         pure
         returns (
-            address fundingId,
+            address sponsorAccount,
             uint48 validUntil,
             uint48 validAfter,
-            uint32 priceMarkup,
+            uint32 feeMarkup,
             uint128 paymasterValidationGasLimit,
             uint128 paymasterPostOpGasLimit,
             bytes calldata signature

@@ -39,7 +39,7 @@ contract SponsorshipPaymasterTest is Test {
         address sponsorAccount;
         uint48 validUntil;
         uint48 validAfter;
-        uint32 dynamicAdjustment;
+        uint32 feeMarkup;
     }
 
     function setUp() external {
@@ -58,9 +58,25 @@ contract SponsorshipPaymasterTest is Test {
         signers[0] = paymasterSigner;
 
         paymaster = new SponsorshipPaymaster(
-            paymasterOwner, address(entryPoint), signers[0], beneficiary, 1 ether, WITHDRAWAL_DELAY, 100000
+            paymasterOwner, address(entryPoint), signers, beneficiary, 1 ether, WITHDRAWAL_DELAY, 100000
         );
         vm.deal(sponsorAccount, 10 ether);
+    }
+
+    function test_addNewSigner() external prankModifier(paymasterOwner) {
+        address newSigner = makeAddr("newSigner");
+        paymaster.addSigner(newSigner);
+        assert(paymaster.isSigner(newSigner));
+    }
+
+    function test_removeSigner() external {
+        address newSigner = makeAddr("newSigner");
+        vm.startPrank(paymasterOwner);
+        paymaster.addSigner(newSigner);
+        assert(paymaster.isSigner(newSigner));
+        paymaster.removeSigner(newSigner);
+        assertEq(paymaster.isSigner(newSigner), false);
+        vm.stopPrank();
     }
 
     function test_DepositForUser() external {
@@ -180,7 +196,7 @@ contract SponsorshipPaymasterTest is Test {
 
     function test_RevertIf_SetUnaccountedGasTooHigh() external prankModifier(paymasterOwner) {
         vm.expectRevert(ISponsorshipPaymasterEventsAndErrors.UnaccountedGasTooHigh.selector);
-        paymaster.setUnaccountedGas(200_000);
+        paymaster.setUnaccountedGas(250_000);
     }
 
     function testSponsorshipSuccess() external {
@@ -228,7 +244,7 @@ contract SponsorshipPaymasterTest is Test {
             sponsorAccount: sponsorAccount,
             validUntil: 0, // 0 means no time limit
             validAfter: 0,
-            dynamicAdjustment: 1000_000
+            feeMarkup: 1000_000
         });
 
         userOp.paymasterAndData = abi.encodePacked(
@@ -238,7 +254,7 @@ contract SponsorshipPaymasterTest is Test {
             data.sponsorAccount,
             data.validUntil,
             data.validAfter,
-            data.dynamicAdjustment
+            data.feeMarkup
         );
 
         // Get hash of paymaster data

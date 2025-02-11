@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 
 /**
  * Helper class for creating a contract with multiple valid signers for sponsorship paymaster data.
  */
-// Note: Could just make this a library. Also Ownable is covered by BasePaymaster
-abstract contract MultiSigners is Ownable {
+abstract contract MultiSigners {
     /// @notice Emitted when a signer is added.
     event SignerAdded(address signer);
 
@@ -20,18 +18,27 @@ abstract contract MultiSigners is Ownable {
     mapping(address account => bool isValidSigner) public signers;
 
     constructor(address[] memory _initialSigners) {
-        for (uint256 i = 0; i < _initialSigners.length; i++) {
+        // cheaper
+        uint256 length = _initialSigners.length;
+        for (uint256 i; i < length;) {
             signers[_initialSigners[i]] = true;
+            unchecked {
+                ++i;
+            }
         }
     }
 
-    function removeSigner(address _signer) public onlyOwner {
+    function _removeSigner(address _signer) internal virtual {
         delete signers[_signer];
         emit SignerRemoved(_signer);
     }
 
-    function addSigner(address _signer) public onlyOwner {
+    function _addSigner(address _signer) internal virtual {
         signers[_signer] = true;
         emit SignerAdded(_signer);
+    }
+
+    function isSigner(address _signer) external view returns (bool) {
+        return signers[_signer];
     }
 }

@@ -6,7 +6,7 @@ The **Sponsorship Paymaster** contract facilitates **gas sponsorship** for **Use
 
 ### 1️⃣ User Deposits & Gas Sponsorship
 - Users deposit **ETH** to fund gas sponsorships.
-- Deposits are recorded in `userBalances` and also **transferred to EntryPoint**.
+- Deposits are recorded in `sponsorBalances` and also **transferred to EntryPoint**.
 - **Paymaster sponsors UserOperations**, deducting required gas fees from the sender’s deposit.
 - A **price markup** (default `1e6` ) allowing **dynamic fee adjustments**.
 
@@ -16,7 +16,7 @@ The **Sponsorship Paymaster** contract facilitates **gas sponsorship** for **Use
 - **Parses `paymasterAndData`** to extract:
   - **`sponsorAccount`**: Who pays for the gas.
   - **`validUntil` & `validAfter`**: Ensures time validity.
-  - **`priceMarkup`**: Applied to gas fees.
+  - **`feeMarkup`**: Applied to gas fees.
   - **`signature`**: Validates sponsorship authorization.
 - **Ensures valid signatures** using **ECDSA recovery**.
 - **Verifies funding account balance** to cover transaction costs.

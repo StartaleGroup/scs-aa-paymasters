@@ -28,14 +28,14 @@ contract DeploySponsorshipPaymaster is Script {
             signersAddr[i] = vm.parseAddress(signers[i]);
         }
 
-        run(salt, owner, signersAddr[0], feeCollector, minDeposit, withdrawalDelay, unaccountedGas);
+        run(salt, owner, signersAddr, feeCollector, minDeposit, withdrawalDelay, unaccountedGas);
     }
 
     // Todo: Review the need for MultiSigner and update accordingly
     function run(
         uint256 _salt,
         address _owner,
-        address _verifyingSigner,
+        address[] memory _signers,
         address _feeCollector,
         uint256 _minDeposit,
         uint256 _withdrawalDelay,
@@ -43,7 +43,7 @@ contract DeploySponsorshipPaymaster is Script {
     ) public {
         vm.startBroadcast();
         SponsorshipPaymaster pm = new SponsorshipPaymaster{salt: bytes32(_salt)}(
-            _owner, entryPoint, _verifyingSigner, _feeCollector, _minDeposit, _withdrawalDelay, _unaccountedGas
+            _owner, entryPoint, _signers, _feeCollector, _minDeposit, _withdrawalDelay, _unaccountedGas
         );
         console.log("Sponsorship Paymaster Contract deployed at ", address(pm));
         vm.stopBroadcast();
