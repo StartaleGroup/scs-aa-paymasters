@@ -92,7 +92,9 @@ contract SponsorshipPaymasterTest is Test {
 
     function test_RevertIf_ExecuteWithdrawalWithNoRequest() external {
         // Expect `NoWithdrawalRequest` custom error with the user's address as parameter
-        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.NoWithdrawalRequest.selector, sponsorAccount));
+        vm.expectRevert(
+            abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.NoWithdrawalRequest.selector, sponsorAccount)
+        );
         vm.prank(sponsorAccount);
         paymaster.executeWithdrawal(sponsorAccount);
     }
@@ -124,7 +126,9 @@ contract SponsorshipPaymasterTest is Test {
         // Attempt to withdraw too soon
         vm.expectRevert(
             abi.encodeWithSelector(
-                ISponsorshipPaymasterEventsAndErrors.WithdrawalTooSoon.selector, sponsorAccount, requestTime + withdrawalDelay
+                ISponsorshipPaymasterEventsAndErrors.WithdrawalTooSoon.selector,
+                sponsorAccount,
+                requestTime + withdrawalDelay
             )
         );
 
