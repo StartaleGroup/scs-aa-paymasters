@@ -7,22 +7,32 @@ import {BasePaymaster} from "../base/BasePaymaster.sol";
 import {UserOperationLib, PackedUserOperation} from "@account-abstraction/contracts/core/UserOperationLib.sol";
 import {_packValidationData} from "@account-abstraction/contracts/core/Helpers.sol";
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
-import {MultiSigners} from "./MultiSigners.sol";
+import {ISponsorshipPaymaster} from "../interfaces/ISponsorshipPaymaster.sol";
 
-contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
+contract SponsorshipPaymaster is BasePaymaster, ISponsorshipPaymaster {
     using UserOperationLib for PackedUserOperation;
 
-    uint256 private constant FUNDING_ID_OFFSET = PAYMASTER_DATA_OFFSET;
-    uint256 private constant FUNDING_ID_LENGTH = 20;
-    uint256 private constant VALID_UNTIL_TIMESTAMP_OFFSET = FUNDING_ID_OFFSET + FUNDING_ID_LENGTH;
-    uint256 private constant TIMESTAMP_DATA_LENGTH = 6;
-    uint256 private constant VALID_AFTER_TIMESTAMP_OFFSET = VALID_UNTIL_TIMESTAMP_OFFSET + TIMESTAMP_DATA_LENGTH;
-    uint256 private constant PRICE_MARKUP_OFFSET = VALID_AFTER_TIMESTAMP_OFFSET + TIMESTAMP_DATA_LENGTH;
-    uint256 private constant PRICE_MARKUP_LENGTH = 4;
-    uint256 private constant _PRICE_DENOMINATOR = 1e6;
-    uint256 private constant SIGNATURE_OFFSET = PRICE_MARKUP_OFFSET + PRICE_MARKUP_LENGTH;
-    uint256 private constant _UNACCOUNTED_GAS_LIMIT = 100_000;
+    // Denominator to prevent precision errors when applying price markup
+    uint256 private constant PRICE_DENOMINATOR = 1e6;
 
+    // Offset in PaymasterAndData to get to PAYMASTER_ID_OFFSET
+    uint256 private constant FUNDING_ID_OFFSET = PAYMASTER_DATA_OFFSET;
+
+    // Limit for unaccounted gas cost
+    uint256 private constant UNACCOUNTED_GAS_LIMIT = 100_000;
+
+    // uint256 private constant FUNDING_ID_LENGTH = 20;
+    uint256 private constant VALID_UNTIL_TIMESTAMP_OFFSET = FUNDING_ID_OFFSET + 20;
+    // uint256 private constant TIMESTAMP_DATA_LENGTH = 6;
+    uint256 private constant VALID_AFTER_TIMESTAMP_OFFSET = VALID_UNTIL_TIMESTAMP_OFFSET + 6;
+    uint256 private constant PRICE_MARKUP_OFFSET = VALID_AFTER_TIMESTAMP_OFFSET + 6;
+    uint256 private constant PRICE_MARKUP_LENGTH = 4;
+    // uint256 private constant PAYMASTER_VALIDATION_GAS_OFFSET = PRICE_MARKUP_OFFSET + PRICE_MARKUP_LENGTH;
+    // uint256 private constant PAYMASTER_VALIDATION_GAS_LENGTH = 16;
+    // uint256 private constant PAYMASTER_POSTOP_GAS_OFFSET = PAYMASTER_VALIDATION_GAS_OFFSET + 16;
+    uint256 private constant SIGNATURE_OFFSET = PAYMASTER_DATA_OFFSET + 36;
+
+    address public verifyingSigner;
     address public feeCollector;
     uint256 public minDeposit;
     mapping(address => uint256) public userBalances;
@@ -31,31 +41,11 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
     uint256 public withdrawalDelay;
     uint256 public unaccountedGas;
 
-    error PaymasterSignatureLengthInvalid();
-    error InsufficientFunds(address user, uint256 balance, uint256 required);
-    error NoWithdrawalRequest(address user);
-    error WithdrawalTooSoon(address user, uint256 nextAllowedTime);
-    error LowDeposit(uint256 provided, uint256 required);
-    error UseDepositForInstead();
-    error SubmitRequestInstead();
-    error UnaccountedGasTooHigh();
-    error CanNotWithdrawZeroAmount();
-    error InvalidPriceMarkup();
-
-    event UserOperationSponsored(bytes32 indexed userOpHash, address indexed user);
-    event DepositAdded(address indexed user, uint256 amount);
-    event GasBalanceDeducted(address indexed user, uint256 amount, uint256 premium, PostOpMode mode);
-    event WithdrawalRequested(address indexed user, uint256 amount);
-    event WithdrawalExecuted(address indexed user, uint256 amount);
-    event FeeCollectorChanged(address indexed oldFeeCollector, address indexed newFeeCollector);
-    event MinDepositChanged(uint256 oldMinDeposit, uint256 newMinDeposit);
-    event RefundProcessed(address indexed user, uint256 amount);
-
     /**
      * @dev Initializes the SponsorshipPaymaster contract.
      * @param _owner The owner of the paymaster.
      * @param _entryPoint The ERC-4337 EntryPoint contract address.
-     * @param _signers Array of authorized signers for paymaster validation.
+     * @param _verifyingSigner Authorized signer for paymaster validation.
      * @param _feeCollector Address that collects the extra fee (premium).
      * @param _minDeposit Minimum deposit required for a user to be sponsored.
      * @param _withdrawalDelay Delay in seconds before a user can withdraw funds.
@@ -64,12 +54,14 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
     constructor(
         address _owner,
         address _entryPoint,
-        address[] memory _signers,
+        address _verifyingSigner,
         address _feeCollector,
         uint256 _minDeposit,
         uint256 _withdrawalDelay,
         uint256 _unaccountedGas
-    ) BasePaymaster(_owner, IEntryPoint(_entryPoint)) MultiSigners(_signers) {
+    ) BasePaymaster(_owner, IEntryPoint(_entryPoint)) {
+        // todo: check constructor args
+        verifyingSigner = _verifyingSigner;
         feeCollector = _feeCollector;
         minDeposit = _minDeposit;
         withdrawalDelay = _withdrawalDelay;
@@ -82,6 +74,8 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
      * @notice Requires first-time deposit to be greater than `minDeposit`.
      */
     function depositForUser() external payable {
+        // Review: and optimise
+        // Todo: cache msg.value in a variable. https://www.evm.codes/ is a good resource for gas costs
         if (msg.value == 0) revert LowDeposit(msg.value, minDeposit);
 
         if (userBalances[msg.sender] == 0 && msg.value < minDeposit) {
@@ -171,7 +165,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
      * @dev Allows the owner to set a new fee collector address.
      * @param newFeeCollector The new fee collector address.
      */
-    function setFeeCollector(address newFeeCollector) external onlyOwner {
+    function setFeeCollector(address newFeeCollector) external payable onlyOwner {
         require(newFeeCollector != address(0), "Invalid feeCollector address");
         address oldFeeCollector = feeCollector;
         feeCollector = newFeeCollector;
@@ -192,7 +186,13 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
      * @param userOp The UserOperation structure.
      * @return The hashed UserOperation data.
      */
-    function getHash(PackedUserOperation calldata userOp) public view returns (bytes32) {
+    function getHash(
+        PackedUserOperation calldata userOp,
+        address fundingId,
+        uint48 validUntil,
+        uint48 validAfter,
+        uint32 priceMarkup
+    ) public view returns (bytes32) {
         return keccak256(
             abi.encode(
                 userOp.getSender(),
@@ -205,7 +205,10 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
                 userOp.gasFees,
                 block.chainid,
                 address(this),
-                userOp.paymasterAndData[PAYMASTER_DATA_OFFSET:SIGNATURE_OFFSET]
+                fundingId,
+                validUntil,
+                validAfter,
+                priceMarkup
             )
         );
     }
@@ -222,17 +225,27 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         bytes32 _userOpHash,
         uint256 requiredPreFund
     ) internal override returns (bytes memory, uint256) {
-        (address sponsorAccount, uint48 validUntil, uint48 validAfter, uint32 priceMarkup, bytes calldata signature) =
-            parsePaymasterAndData(_userOp.paymasterAndData);
+        (
+            address sponsorAccount,
+            uint48 validUntil,
+            uint48 validAfter,
+            uint32 priceMarkup,
+            uint128 paymasterValidationGasLimit,
+            uint128 paymasterPostOpGasLimit,
+            bytes calldata signature
+        ) = parsePaymasterAndData(_userOp.paymasterAndData);
+        (paymasterValidationGasLimit, paymasterPostOpGasLimit);
 
         if (signature.length != 64 && signature.length != 65) {
             revert PaymasterSignatureLengthInvalid();
         }
 
-        bytes32 hash = MessageHashUtils.toEthSignedMessageHash(getHash(_userOp));
+        bytes32 hash = MessageHashUtils.toEthSignedMessageHash(
+            getHash(_userOp, sponsorAccount, validUntil, validAfter, priceMarkup)
+        );
         address recoveredSigner = ECDSA.recover(hash, signature);
 
-        bool isSignatureValid = signers[recoveredSigner];
+        bool isSignatureValid = recoveredSigner == verifyingSigner;
         uint256 validationData = _packValidationData(!isSignatureValid, validUntil, validAfter);
 
         // Do not revert if signature is invalid, just return validationData
@@ -255,7 +268,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
 
         // Calculate effective cost including unaccountedGas and priceMarkup
         uint256 effectiveCost =
-            ((requiredPreFund + (unaccountedGas * _userOp.unpackMaxFeePerGas())) * priceMarkup) / _PRICE_DENOMINATOR;
+            ((requiredPreFund + (unaccountedGas * _userOp.unpackMaxFeePerGas())) * priceMarkup) / PRICE_DENOMINATOR;
 
         // Ensure the paymaster can cover the effective cost + max penalty
         if (effectiveCost + maxPenalty > userBalances[sponsorAccount]) {
@@ -286,7 +299,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         // unaccountedGas = postOpGas + EP overhead gas
         actualGasCost = actualGasCost + (unaccountedGas * actualUserOpFeePerGas);
 
-        uint256 adjustedGasCost = (actualGasCost * priceMarkup) / _PRICE_DENOMINATOR;
+        uint256 adjustedGasCost = (actualGasCost * priceMarkup) / PRICE_DENOMINATOR;
         uint256 premium = adjustedGasCost - actualGasCost;
         userBalances[feeCollector] += premium;
 
@@ -319,18 +332,23 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
         public
         pure
         returns (
-            address sponsorAccount,
+            address sponsorAccount, // Review: call it funding id consistently
             uint48 validUntil,
             uint48 validAfter,
             uint32 priceMarkup,
+            uint128 paymasterValidationGasLimit,
+            uint128 paymasterPostOpGasLimit,
             bytes calldata signature
         )
     {
-        require(_paymasterAndData.length > SIGNATURE_OFFSET, "Invalid paymasterAndData length");
+        // require(_paymasterAndData.length > SIGNATURE_OFFSET, "Invalid paymasterAndData length");
         sponsorAccount = address(bytes20(_paymasterAndData[FUNDING_ID_OFFSET:VALID_UNTIL_TIMESTAMP_OFFSET]));
         validUntil = uint48(bytes6(_paymasterAndData[VALID_UNTIL_TIMESTAMP_OFFSET:VALID_AFTER_TIMESTAMP_OFFSET]));
         validAfter = uint48(bytes6(_paymasterAndData[VALID_AFTER_TIMESTAMP_OFFSET:PRICE_MARKUP_OFFSET]));
-        priceMarkup = uint32(bytes4(_paymasterAndData[PRICE_MARKUP_OFFSET:SIGNATURE_OFFSET]));
+        priceMarkup = uint32(bytes4(_paymasterAndData[PRICE_MARKUP_OFFSET:PRICE_MARKUP_OFFSET + PRICE_MARKUP_LENGTH]));
+        paymasterValidationGasLimit =
+            uint128(bytes16(_paymasterAndData[PAYMASTER_VALIDATION_GAS_OFFSET:PAYMASTER_POSTOP_GAS_OFFSET]));
+        paymasterPostOpGasLimit = uint128(bytes16(_paymasterAndData[PAYMASTER_POSTOP_GAS_OFFSET:PAYMASTER_DATA_OFFSET]));
         signature = _paymasterAndData[SIGNATURE_OFFSET:];
     }
 
@@ -351,11 +369,11 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners {
 
     /**
      * @dev Allows the owner to set the extra gas used in post-op calculations.
-     * @notice Ensures the value does not exceed `_UNACCOUNTED_GAS_LIMIT`.
+     * @notice Ensures the value does not exceed `UNACCOUNTED_GAS_LIMIT`.
      * @param value The new unaccounted gas value.
      */
     function setUnaccountedGas(uint256 value) external payable onlyOwner {
-        if (value > _UNACCOUNTED_GAS_LIMIT) {
+        if (value > UNACCOUNTED_GAS_LIMIT) {
             revert UnaccountedGasTooHigh();
         }
         unaccountedGas = value;

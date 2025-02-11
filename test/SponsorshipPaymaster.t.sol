@@ -9,6 +9,7 @@ import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/Messa
 import {TestCounter} from "./TestCounter.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {SimpleAccountFactory, SimpleAccount} from "@account-abstraction/contracts/samples/SimpleAccountFactory.sol";
+import {ISponsorshipPaymasterEventsAndErrors} from "../src/interfaces/ISponsorshipPaymasterEventsAndErrors.sol";
 
 contract SponsorshipPaymasterTest is Test {
     SponsorshipPaymaster paymaster;
@@ -56,13 +57,9 @@ contract SponsorshipPaymasterTest is Test {
         address[] memory signers = new address[](1);
         signers[0] = paymasterSigner;
 
-        vm.prank(paymasterOwner);
         paymaster = new SponsorshipPaymaster(
-            paymasterOwner, address(entryPoint), signers, beneficiary, 1 ether, WITHDRAWAL_DELAY, 100000
+            paymasterOwner, address(entryPoint), signers[0], beneficiary, 1 ether, WITHDRAWAL_DELAY, 100000
         );
-
-        vm.prank(paymasterOwner);
-        paymaster.addSigner(paymasterSigner);
         vm.deal(sponsorAccount, 10 ether);
     }
 
@@ -76,7 +73,7 @@ contract SponsorshipPaymasterTest is Test {
 
     function test_RevertIf_DepositForUserZero() external {
         // Expect `LowDeposit(0, minDeposit)` custom error with correct parameters
-        vm.expectRevert(abi.encodeWithSelector(SponsorshipPaymaster.LowDeposit.selector, 0, 1 ether));
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.LowDeposit.selector, 0, 1 ether));
         vm.prank(sponsorAccount);
         paymaster.depositForUser{value: 0}();
     }
@@ -95,7 +92,7 @@ contract SponsorshipPaymasterTest is Test {
 
     function test_RevertIf_ExecuteWithdrawalWithNoRequest() external {
         // Expect `NoWithdrawalRequest` custom error with the user's address as parameter
-        vm.expectRevert(abi.encodeWithSelector(SponsorshipPaymaster.NoWithdrawalRequest.selector, sponsorAccount));
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.NoWithdrawalRequest.selector, sponsorAccount));
         vm.prank(sponsorAccount);
         paymaster.executeWithdrawal(sponsorAccount);
     }
@@ -127,7 +124,7 @@ contract SponsorshipPaymasterTest is Test {
         // Attempt to withdraw too soon
         vm.expectRevert(
             abi.encodeWithSelector(
-                SponsorshipPaymaster.WithdrawalTooSoon.selector, sponsorAccount, requestTime + withdrawalDelay
+                ISponsorshipPaymasterEventsAndErrors.WithdrawalTooSoon.selector, sponsorAccount, requestTime + withdrawalDelay
             )
         );
 
@@ -178,7 +175,7 @@ contract SponsorshipPaymasterTest is Test {
     }
 
     function test_RevertIf_SetUnaccountedGasTooHigh() external prankModifier(paymasterOwner) {
-        vm.expectRevert(SponsorshipPaymaster.UnaccountedGasTooHigh.selector);
+        vm.expectRevert(ISponsorshipPaymasterEventsAndErrors.UnaccountedGasTooHigh.selector);
         paymaster.setUnaccountedGas(200_000);
     }
 
@@ -241,7 +238,7 @@ contract SponsorshipPaymasterTest is Test {
         );
 
         // Get hash of paymaster data
-        bytes32 hash = paymaster.getHash(userOp);
+        bytes32 hash = paymaster.getHash(userOp, sponsorAccount, 0, 0, 1000_000);
         bytes memory sig = getSignature(hash, paymasterSignerKey);
 
         // Just added sig to the end of paymasterAndData.

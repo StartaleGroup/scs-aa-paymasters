@@ -8,6 +8,7 @@ import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint
 /**
  * Helper class for creating a contract with multiple valid signers for sponsorship paymaster data.
  */
+// Note: Could just make this a library. Also Ownable is covered by BasePaymaster
 abstract contract MultiSigners is Ownable {
     /// @notice Emitted when a signer is added.
     event SignerAdded(address signer);
