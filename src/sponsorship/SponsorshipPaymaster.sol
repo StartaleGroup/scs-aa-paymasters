@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import { SignatureCheckerLib } from "solady/utils/SignatureCheckerLib.sol";
+import { ECDSA as ECDSA_solady } from "solady/utils/ECDSA.sol";
 import {BasePaymaster} from "../base/BasePaymaster.sol";
 import {UserOperationLib, PackedUserOperation} from "@account-abstraction/contracts/core/UserOperationLib.sol";
 import {_packValidationData} from "@account-abstraction/contracts/core/Helpers.sol";
@@ -12,6 +12,8 @@ import {MultiSigners} from "./MultiSigners.sol";
 
 contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ISponsorshipPaymaster {
     using UserOperationLib for PackedUserOperation;
+    using SignatureCheckerLib for address;
+    using ECDSA_solady for bytes32;
 
     // Denominator to prevent precision errors when applying fee markup
     uint256 private constant FEE_MARKUP_DENOMINATOR = 1e6;
@@ -265,15 +267,18 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ISponsorshipPaymas
             revert PaymasterSignatureLengthInvalid();
         }
 
-        bytes32 hash =
-            MessageHashUtils.toEthSignedMessageHash(getHash(_userOp, sponsorAccount, validUntil, validAfter, feeMarkup));
-        address recoveredSigner = ECDSA.recover(hash, signature);
+        address recoveredSigner = (
+            (getHash(_userOp, sponsorAccount, validUntil, validAfter, feeMarkup).toEthSignedMessageHash()).tryRecover(
+                signature
+            )
+        );
 
-        bool isSignatureValid = signers[recoveredSigner];
-        uint256 validationData = _packValidationData(!isSignatureValid, validUntil, validAfter);
+        bool isValidSig = signers[recoveredSigner];
+
+        uint256 validationData = _packValidationData(!isValidSig, validUntil, validAfter);
 
         // Do not revert if signature is invalid, just return validationData
-        if (!isSignatureValid) {
+        if (!isValidSig) {
             return ("", validationData);
         }
 
