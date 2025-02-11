@@ -75,22 +75,24 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ISponsorshipPaymas
 
     /**
      * @dev Allows users to deposit ETH to be used for sponsoring gas fees.
+     * @param _sponsorAccount The address of the user making the deposit.
      * @notice The deposit is recorded in `sponsorBalances` and also transferred to EntryPoint.
      * @notice Requires first-time deposit to be greater than `minDeposit`.
      */
-    function depositForUser() external payable {
-        // Review: and optimise
-        // Todo: cache msg.value in a variable. https://www.evm.codes/ is a good resource for gas costs
-        if (msg.value == 0) revert LowDeposit(msg.value, minDeposit);
+    function depositFor(address _sponsorAccount) external payable {
+        // cache msg.value in a variable. https://www.evm.codes/ is a good resource for gas costs
+        uint256 depositAmount = msg.value;
 
-        if (sponsorBalances[msg.sender] == 0 && msg.value < minDeposit) {
-            revert LowDeposit(msg.value, minDeposit);
+        if (depositAmount == 0) revert LowDeposit(depositAmount, minDeposit);
+
+        if (sponsorBalances[_sponsorAccount] == 0 && depositAmount < minDeposit) {
+            revert LowDeposit(depositAmount, minDeposit);
         }
 
-        entryPoint.depositTo{value: msg.value}(address(this));
-        sponsorBalances[msg.sender] += msg.value;
+        sponsorBalances[_sponsorAccount] += depositAmount;
+        emit DepositAdded(_sponsorAccount, msg.value);
 
-        emit DepositAdded(msg.sender, msg.value);
+        entryPoint.depositTo{value: depositAmount}(address(this));
     }
 
     /**

@@ -79,25 +79,24 @@ contract SponsorshipPaymasterTest is Test {
         vm.stopPrank();
     }
 
-    function test_DepositForUser() external {
+    function test_DepositFor() external {
         uint256 depositAmount = 10 ether;
         vm.prank(sponsorAccount);
-        paymaster.depositForUser{value: depositAmount}();
-
+        paymaster.depositFor{value: depositAmount}(sponsorAccount);
         assertEq(paymaster.getBalance(sponsorAccount), depositAmount);
     }
 
-    function test_RevertIf_DepositForUserZero() external {
+    function test_RevertIf_DepositIsZero() external {
         // Expect `LowDeposit(0, minDeposit)` custom error with correct parameters
         vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.LowDeposit.selector, 0, 1 ether));
-        vm.prank(sponsorAccount);
-        paymaster.depositForUser{value: 0}();
+        vm.prank(sponsorAccount); // not necessary though. anyone can deposit
+        paymaster.depositFor{value: 0}(sponsorAccount);
     }
 
     function test_RequestWithdrawal() external {
         uint256 depositAmount = 5 ether;
         vm.prank(sponsorAccount);
-        paymaster.depositForUser{value: depositAmount}();
+        paymaster.depositFor{value: depositAmount}(sponsorAccount);
 
         vm.prank(sponsorAccount);
         paymaster.requestWithdrawal(3 ether);
@@ -126,7 +125,7 @@ contract SponsorshipPaymasterTest is Test {
 
         // Sponsor deposits funds
         vm.prank(sponsorAccount);
-        paymaster.depositForUser{value: depositAmount}();
+        paymaster.depositFor{value: depositAmount}(sponsorAccount);
 
         assertEq(paymaster.getBalance(sponsorAccount), depositAmount);
 
@@ -158,7 +157,7 @@ contract SponsorshipPaymasterTest is Test {
         uint256 withdrawalDelay = 10;
         // Sponsor deposits funds
         vm.prank(sponsorAccount);
-        paymaster.depositForUser{value: depositAmount}();
+        paymaster.depositFor{value: depositAmount}(sponsorAccount);
 
         assertEq(paymaster.getBalance(sponsorAccount), depositAmount); // Ensure deposit success
         // Sponsor requests withdrawal
@@ -201,7 +200,7 @@ contract SponsorshipPaymasterTest is Test {
 
     function testSponsorshipSuccess() external {
         vm.prank(sponsorAccount);
-        paymaster.depositForUser{value: 10 ether}();
+        paymaster.depositFor{value: 10 ether}(sponsorAccount);
 
         address sender = address(account);
         bytes memory callData = abi.encodeWithSelector(

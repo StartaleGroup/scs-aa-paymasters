@@ -46,7 +46,7 @@ The **Sponsorship Paymaster** contract facilitates **gas sponsorship** for **Use
 - **Set minimum deposit** (`setMinDeposit`): Ensures sponsorship viability.
 - **Set fee collector** (`setFeeCollector`): Redirects markup profits.
 - **Update unaccounted gas** (`setUnaccountedGas`): Ensures accurate gas calculations.
-- **Prevent direct deposits** (`deposit()`): Redirects users to `depositForUser`.
+- **Prevent direct deposits** (`deposit()`): Redirects users to `depositFor`.
 
 ---
 
