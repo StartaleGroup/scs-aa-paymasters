@@ -16,6 +16,8 @@ interface ISponsorshipPaymasterEventsAndErrors {
     error CanNotWithdrawZeroAmount();
     error InvalidPriceMarkup();
     error InvalidWithdrawalAddress();
+    error FeeCollectorCanNotBeZero();
+    error FeeCollectorCanNotBeContract();
 
     event UserOperationSponsored(bytes32 indexed userOpHash, address indexed user);
     event DepositAdded(address indexed user, uint256 amount);
@@ -25,4 +27,12 @@ interface ISponsorshipPaymasterEventsAndErrors {
     event FeeCollectorChanged(address indexed oldFeeCollector, address indexed newFeeCollector);
     event MinDepositChanged(uint256 oldMinDeposit, uint256 newMinDeposit);
     event RefundProcessed(address indexed user, uint256 amount);
+    event EthWithdrawn(address indexed recipient, uint256 indexed amount);
+    /**
+     * @notice Throws when ETH withdrawal fails
+     */
+
+    error WithdrawalFailed();
+
+    event TokensWithdrawn(address indexed token, address indexed to, uint256 indexed amount, address actor);
 }

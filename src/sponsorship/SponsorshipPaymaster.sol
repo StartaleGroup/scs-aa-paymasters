@@ -3,14 +3,17 @@ pragma solidity ^0.8.28;
 
 import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
 import {ECDSA as ECDSA_solady} from "solady/utils/ECDSA.sol";
+import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {BasePaymaster} from "../base/BasePaymaster.sol";
 import {UserOperationLib, PackedUserOperation} from "@account-abstraction/contracts/core/UserOperationLib.sol";
 import {_packValidationData} from "@account-abstraction/contracts/core/Helpers.sol";
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ISponsorshipPaymaster} from "../interfaces/ISponsorshipPaymaster.sol";
 import {MultiSigners} from "./MultiSigners.sol";
 
-contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ISponsorshipPaymaster {
+contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTransient, ISponsorshipPaymaster {
     using UserOperationLib for PackedUserOperation;
     using SignatureCheckerLib for address;
     using ECDSA_solady for bytes32;
@@ -67,11 +70,25 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ISponsorshipPaymas
         uint256 _withdrawalDelay,
         uint256 _unaccountedGas
     ) BasePaymaster(_owner, IEntryPoint(_entryPoint)) MultiSigners(_signers) {
-        // todo: check constructor args
+        _checkConstructorArgs(_feeCollector, _unaccountedGas);
         feeCollector = _feeCollector;
         minDeposit = _minDeposit;
         sponsorWithdrawalDelay = _withdrawalDelay;
         unaccountedGas = _unaccountedGas;
+    }
+
+    function _checkConstructorArgs(address _feeCollectorArg, uint256 _unaccountedGasArg) internal view {
+        // Checks for constructor arguments
+        // Ensure feeCollector is not zero address
+        // Ensure feeCollector is not a contract
+        // Ensure unaccountedGas is within limit
+        if (_feeCollectorArg == address(0)) {
+            revert FeeCollectorCanNotBeZero();
+        } else if (_isContract(_feeCollectorArg)) {
+            revert FeeCollectorCanNotBeContract();
+        } else if (_unaccountedGasArg > UNACCOUNTED_GAS_LIMIT) {
+            revert UnaccountedGasTooHigh();
+        }
     }
 
     /**
@@ -80,7 +97,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ISponsorshipPaymas
      * @notice The deposit is recorded in `sponsorBalances` and also transferred to EntryPoint.
      * @notice Requires first-time deposit to be greater than `minDeposit`.
      */
-    function depositFor(address _sponsorAccount) external payable {
+    function depositFor(address _sponsorAccount) external payable nonReentrant {
         // cache msg.value in a variable. https://www.evm.codes/ is a good resource for gas costs
         uint256 depositAmount = msg.value;
 
@@ -124,7 +141,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ISponsorshipPaymas
             revert InsufficientFunds(msg.sender, sponsorBalances[msg.sender], amount);
         }
         withdrawalRequests[msg.sender] =
-            WithdrawalRequest({ amount: amount, to: withdrawAddress, requestSubmittedTimestamp: block.timestamp });
+            WithdrawalRequest({amount: amount, to: withdrawAddress, requestSubmittedTimestamp: block.timestamp});
         emit WithdrawalRequested(msg.sender, withdrawAddress, amount);
     }
 
@@ -141,7 +158,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ISponsorshipPaymas
      * @notice Ensures the request was made, checks withdrawal delay
      * @param sponsorAccount The address of the user withdrawing funds.
      */
-    function executeWithdrawal(address sponsorAccount) external {
+    function executeWithdrawal(address sponsorAccount) external nonReentrant {
         WithdrawalRequest memory req = withdrawalRequests[sponsorAccount];
         if (req.requestSubmittedTimestamp == 0) revert NoWithdrawalRequestSubmitted(sponsorAccount);
 
@@ -153,7 +170,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ISponsorshipPaymas
         uint256 currentBalance = sponsorBalances[sponsorAccount];
 
         req.amount = req.amount > currentBalance ? currentBalance : req.amount;
-        if(req.amount == 0) revert CanNotWithdrawZeroAmount();
+        if (req.amount == 0) revert CanNotWithdrawZeroAmount();
         sponsorBalances[sponsorAccount] = currentBalance - req.amount;
         delete withdrawalRequests[sponsorAccount];
         entryPoint.withdrawTo(payable(req.to), req.amount);
@@ -185,6 +202,30 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ISponsorshipPaymas
      */
     function removeSigner(address _signer) external payable onlyOwner {
         _removeSigner(_signer);
+    }
+
+    function withdrawEth(address payable recipient, uint256 amount) external payable onlyOwner nonReentrant {
+        (bool success,) = recipient.call{value: amount}("");
+        if (!success) {
+            revert WithdrawalFailed();
+        }
+        emit EthWithdrawn(recipient, amount);
+    }
+
+    /**
+     * @dev pull tokens out of paymaster in case they were sent to the paymaster at any point.
+     * @param token the token deposit to withdraw
+     * @param target address to send to
+     * @param amount amount to withdraw
+     */
+    function withdrawERC20(IERC20 token, address target, uint256 amount) external onlyOwner nonReentrant {
+        _withdrawERC20(token, target, amount);
+    }
+
+    function _withdrawERC20(IERC20 token, address target, uint256 amount) private {
+        if (target == address(0)) revert InvalidWithdrawalAddress();
+        SafeTransferLib.safeTransfer(address(token), target, amount);
+        emit TokensWithdrawn(address(token), target, amount, msg.sender);
     }
 
     /**

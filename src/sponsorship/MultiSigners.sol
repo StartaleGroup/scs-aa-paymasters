@@ -14,13 +14,25 @@ abstract contract MultiSigners {
     /// @notice Emitted when a signer is removed.
     event SignerRemoved(address signer);
 
+    /// @notice Error when no signers are provided during contract deployment.
+    error NoInitialSigners();
+
+    /// @notice Error when a signer address is zero.
+    error SignerAddressCannotBeZero();
+
+    /// @notice Error when a signer address is a contract.
+    error SignerAddressCannotBeContract();
+
     /// @notice Mapping of valid signers.
     mapping(address account => bool isValidSigner) public signers;
 
     constructor(address[] memory _initialSigners) {
         // cheaper
         uint256 length = _initialSigners.length;
+        if (length == 0) revert NoInitialSigners();
         for (uint256 i; i < length;) {
+            if (_initialSigners[i] == address(0)) revert SignerAddressCannotBeZero();
+            if (_isSmartContract(_initialSigners[i])) revert SignerAddressCannotBeContract();
             signers[_initialSigners[i]] = true;
             unchecked {
                 ++i;
@@ -36,6 +48,17 @@ abstract contract MultiSigners {
     function _addSigner(address _signer) internal virtual {
         signers[_signer] = true;
         emit SignerAdded(_signer);
+    }
+
+    /**
+     * Check if address is a contract
+     */
+    function _isSmartContract(address addr) private view returns (bool) {
+        uint256 size;
+        assembly ("memory-safe") {
+            size := extcodesize(addr)
+        }
+        return size > 0;
     }
 
     function isSigner(address _signer) external view returns (bool) {

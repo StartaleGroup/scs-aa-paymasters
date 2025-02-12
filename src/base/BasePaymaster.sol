@@ -141,4 +141,15 @@ abstract contract BasePaymaster is IPaymaster, SoladyOwnable {
             "IEntryPoint interface mismatch"
         );
     }
+
+    /**
+     * Check if address is a contract
+     */
+    function _isContract(address addr) internal view returns (bool) {
+        uint256 size;
+        assembly ("memory-safe") {
+            size := extcodesize(addr)
+        }
+        return size > 0;
+    }
 }

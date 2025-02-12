@@ -111,7 +111,11 @@ contract SponsorshipPaymasterTest is Test {
     }
 
     function test_executeWithdrawalRequest_Fails_with_NoRequestSubmitted() external prankModifier(sponsorAccount) {
-        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.NoWithdrawalRequestSubmitted.selector, sponsorAccount));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISponsorshipPaymasterEventsAndErrors.NoWithdrawalRequestSubmitted.selector, sponsorAccount
+            )
+        );
         paymaster.executeWithdrawal(sponsorAccount);
     }
 
@@ -125,11 +129,11 @@ contract SponsorshipPaymasterTest is Test {
         uint256 depositAmount = 1 ether;
         uint256 withdrawAmount = 0.5 ether;
 
-        paymaster.depositFor{ value: depositAmount }(sponsorAccount);
+        paymaster.depositFor{value: depositAmount}(sponsorAccount);
         assertEq(paymaster.getBalance(sponsorAccount), depositAmount);
 
         address withdrawAddress = makeAddr("withdrawAddress");
-        
+
         vm.startPrank(sponsorAccount);
         paymaster.requestWithdrawal(withdrawAddress, withdrawAmount);
         uint256 requestTime = block.timestamp;
@@ -149,11 +153,11 @@ contract SponsorshipPaymasterTest is Test {
 
     function test_executeWithdrawalRequest_Happy_Scenario() external {
         uint256 depositAmount = 1 ether;
-        paymaster.depositFor{ value: depositAmount }(sponsorAccount);
+        paymaster.depositFor{value: depositAmount}(sponsorAccount);
         assertEq(paymaster.getBalance(sponsorAccount), depositAmount);
 
         address withdrawAddress = makeAddr("withdrawAddress");
-        
+
         vm.startPrank(sponsorAccount);
         paymaster.requestWithdrawal(withdrawAddress, depositAmount);
         vm.stopPrank();
@@ -167,7 +171,11 @@ contract SponsorshipPaymasterTest is Test {
         assertEq(sponsorAccountPaymasterBalanceAfter, sponsorAccountPaymasterBalanceBefore - depositAmount);
         assertEq(withdrawAddressBalanceAfter, withdrawAddressBalanceBefore + depositAmount);
         // can not withdraw again
-        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.NoWithdrawalRequestSubmitted.selector, sponsorAccount));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISponsorshipPaymasterEventsAndErrors.NoWithdrawalRequestSubmitted.selector, sponsorAccount
+            )
+        );
         paymaster.executeWithdrawal(sponsorAccount);
     }
 
