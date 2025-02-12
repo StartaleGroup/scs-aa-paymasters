@@ -25,7 +25,7 @@ contract SponsorshipPaymasterTest is Test {
     address user;
     uint256 userKey;
     address sponsorAccount;
-    uint256 constant WITHDRAWAL_DELAY = 10;
+    uint256 public constant WITHDRAWAL_DELAY = 3600;
 
     modifier prankModifier(address sender) {
         vm.prank(sender);
@@ -93,50 +93,47 @@ contract SponsorshipPaymasterTest is Test {
         paymaster.depositFor{value: 0}(sponsorAccount);
     }
 
-    function test_RequestWithdrawal() external {
-        uint256 depositAmount = 5 ether;
-        vm.prank(sponsorAccount);
-        paymaster.depositFor{value: depositAmount}(sponsorAccount);
-
-        vm.prank(sponsorAccount);
-        paymaster.requestWithdrawal(3 ether);
-
-        assertEq(paymaster.withdrawalRequests(sponsorAccount), 3 ether);
-        assertEq(paymaster.lastWithdrawalTimestamp(sponsorAccount), block.timestamp);
+    function test_RevertIf_TriesWithdrawToWithoutRequest() external prankModifier(sponsorAccount) {
+        address withdrawAddress = makeAddr("withdrawAddress");
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.SubmitRequestInstead.selector));
+        paymaster.withdrawTo(payable(withdrawAddress), 1 ether);
     }
 
-    function test_RevertIf_ExecuteWithdrawalWithNoRequest() external {
-        // Expect `NoWithdrawalRequest` custom error with the user's address as parameter
-        vm.expectRevert(
-            abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.NoWithdrawalRequest.selector, sponsorAccount)
-        );
-        vm.prank(sponsorAccount);
+    function test_submitWithdrawalRequest_Fails_with_ZeroAmount() external prankModifier(sponsorAccount) {
+        address withdrawAddress = makeAddr("withdrawAddress");
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.CanNotWithdrawZeroAmount.selector));
+        paymaster.requestWithdrawal(withdrawAddress, 0 ether);
+    }
+
+    function test_submitWithdrawalRequest_Fails_with_ZeroAddress() external prankModifier(sponsorAccount) {
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.InvalidWithdrawalAddress.selector));
+        paymaster.requestWithdrawal(address(0), 1 ether);
+    }
+
+    function test_executeWithdrawalRequest_Fails_with_NoRequestSubmitted() external prankModifier(sponsorAccount) {
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.NoWithdrawalRequestSubmitted.selector, sponsorAccount));
         paymaster.executeWithdrawal(sponsorAccount);
     }
 
-    function test_RevertIf_RequestWithdrawalTooSoon() external {
-        uint256 depositAmount = 5 ether;
-        uint256 withdrawalAmount = 3 ether;
+    function test_executeWithdrawalRequest_Reverts_If_Withdraws_TooSoon() external {
         uint256 withdrawalDelay = 10;
 
-        // Set withdrawal delay in the contract
-        vm.prank(paymasterOwner);
+        vm.startPrank(paymasterOwner);
         paymaster.setWithdrawalDelay(withdrawalDelay);
+        vm.stopPrank();
 
-        // Sponsor deposits funds
-        vm.prank(sponsorAccount);
-        paymaster.depositFor{value: depositAmount}(sponsorAccount);
+        uint256 depositAmount = 1 ether;
+        uint256 withdrawAmount = 0.5 ether;
 
+        paymaster.depositFor{ value: depositAmount }(sponsorAccount);
         assertEq(paymaster.getBalance(sponsorAccount), depositAmount);
 
-        // Sponsor requests withdrawal
-        vm.prank(sponsorAccount);
-        paymaster.requestWithdrawal(withdrawalAmount);
-
-        // Ensure withdrawal request is set
-        assertEq(paymaster.withdrawalRequests(sponsorAccount), withdrawalAmount);
+        address withdrawAddress = makeAddr("withdrawAddress");
+        
+        vm.startPrank(sponsorAccount);
+        paymaster.requestWithdrawal(withdrawAddress, withdrawAmount);
         uint256 requestTime = block.timestamp;
-        assertEq(paymaster.lastWithdrawalTimestamp(sponsorAccount), requestTime);
+        vm.stopPrank();
 
         // Attempt to withdraw too soon
         vm.expectRevert(
@@ -147,45 +144,35 @@ contract SponsorshipPaymasterTest is Test {
             )
         );
 
-        vm.prank(sponsorAccount);
         paymaster.executeWithdrawal(sponsorAccount);
     }
 
-    function testExecuteWithdrawal() external {
-        uint256 depositAmount = 5 ether;
-        uint256 withdrawalAmount = 3 ether;
-        uint256 withdrawalDelay = 10;
-        // Sponsor deposits funds
-        vm.prank(sponsorAccount);
-        paymaster.depositFor{value: depositAmount}(sponsorAccount);
+    function test_executeWithdrawalRequest_Happy_Scenario() external {
+        uint256 depositAmount = 1 ether;
+        paymaster.depositFor{ value: depositAmount }(sponsorAccount);
+        assertEq(paymaster.getBalance(sponsorAccount), depositAmount);
 
-        assertEq(paymaster.getBalance(sponsorAccount), depositAmount); // Ensure deposit success
-        // Sponsor requests withdrawal
-        vm.prank(sponsorAccount);
-        paymaster.requestWithdrawal(withdrawalAmount);
-        assertEq(paymaster.withdrawalRequests(sponsorAccount), 3 ether); // Ensure withdrawal request is set
-        assertEq(paymaster.lastWithdrawalTimestamp(sponsorAccount), block.timestamp); // Ensure withdrawal timestamp is set
+        address withdrawAddress = makeAddr("withdrawAddress");
+        
+        vm.startPrank(sponsorAccount);
+        paymaster.requestWithdrawal(withdrawAddress, depositAmount);
+        vm.stopPrank();
 
-        vm.warp(block.timestamp + withdrawalDelay + 200);
-
-        uint256 sponsorBalanceBefore = sponsorAccount.balance;
-
-        // Execute withdrawal
-        vm.prank(sponsorAccount);
+        vm.warp(block.timestamp + WITHDRAWAL_DELAY + 1);
+        uint256 sponsorAccountPaymasterBalanceBefore = paymaster.getBalance(sponsorAccount);
+        uint256 withdrawAddressBalanceBefore = withdrawAddress.balance;
         paymaster.executeWithdrawal(sponsorAccount);
-
-        // Ensure withdrawal request is cleared
-        assertEq(paymaster.withdrawalRequests(sponsorAccount), 0);
-
-        // Ensure withdrawal timestamp is cleared
-        assertEq(paymaster.lastWithdrawalTimestamp(sponsorAccount), 0);
-
-        // Ensure user's balance is reduced
-        assertEq(paymaster.getBalance(sponsorAccount), depositAmount - withdrawalAmount);
-
-        // Ensure funds were received by sponsor
-        assertEq(sponsorAccount.balance, sponsorBalanceBefore + withdrawalAmount);
+        uint256 sponsorAccountPaymasterBalanceAfter = paymaster.getBalance(sponsorAccount);
+        uint256 withdrawAddressBalanceAfter = withdrawAddress.balance;
+        assertEq(sponsorAccountPaymasterBalanceAfter, sponsorAccountPaymasterBalanceBefore - depositAmount);
+        assertEq(withdrawAddressBalanceAfter, withdrawAddressBalanceBefore + depositAmount);
+        // can not withdraw again
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.NoWithdrawalRequestSubmitted.selector, sponsorAccount));
+        paymaster.executeWithdrawal(sponsorAccount);
     }
+
+    // Note: If we send an userOp between submit request (full amount withdraw) and execute request then it will withdraw whatever is left.
+    // TODO: test_executeWithdrawalRequest_Withdraws_WhateverIsLeft
 
     function test_SetUnaccountedGas() external prankModifier(paymasterOwner) {
         uint256 newUnaccountedGas = 80_000;

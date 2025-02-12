@@ -42,11 +42,10 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ISponsorshipPaymas
     uint256 public minDeposit;
     mapping(address => uint256) public sponsorBalances;
 
-    //Todo: Keep withdrwal related info in one struct
-    mapping(address => uint256) public withdrawalRequests;
-    mapping(address => uint256) public lastWithdrawalTimestamp;
+    //Keep withdrwal related info in one struct
+    mapping(address sponsorAccount => WithdrawalRequest request) internal withdrawalRequests;
 
-    uint256 public withdrawalDelay;
+    uint256 public sponsorWithdrawalDelay;
     uint256 public unaccountedGas;
 
     /**
@@ -71,7 +70,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ISponsorshipPaymas
         // todo: check constructor args
         feeCollector = _feeCollector;
         minDeposit = _minDeposit;
-        withdrawalDelay = _withdrawalDelay;
+        sponsorWithdrawalDelay = _withdrawalDelay;
         unaccountedGas = _unaccountedGas;
     }
 
@@ -109,24 +108,24 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ISponsorshipPaymas
     /**
      * @dev Allows users to request withdrawals from their paymaster balance.
      * @notice Ensures the user has enough balance and respects the withdrawal delay.
+     * @param withdrawAddress The address to send the withdrawal to.
      * @param amount The amount of ETH the user wishes to withdraw.
      */
-    function requestWithdrawal(uint256 amount) external {
+    function requestWithdrawal(address withdrawAddress, uint256 amount) external {
+        // check zero address for withdrawal
+        if (withdrawAddress == address(0)) {
+            revert InvalidWithdrawalAddress();
+        }
+        // check for non-zero amount
+        if (amount == 0) {
+            revert CanNotWithdrawZeroAmount();
+        }
         if (sponsorBalances[msg.sender] < amount) {
             revert InsufficientFunds(msg.sender, sponsorBalances[msg.sender], amount);
         }
-
-        // Apply delay check only if there's a previous withdrawal timestamp
-        if (
-            lastWithdrawalTimestamp[msg.sender] > 0
-                && block.timestamp < lastWithdrawalTimestamp[msg.sender] + withdrawalDelay
-        ) {
-            revert WithdrawalTooSoon(msg.sender, lastWithdrawalTimestamp[msg.sender] + withdrawalDelay);
-        }
-
-        withdrawalRequests[msg.sender] = amount;
-        lastWithdrawalTimestamp[msg.sender] = block.timestamp;
-        emit WithdrawalRequested(msg.sender, amount);
+        withdrawalRequests[msg.sender] =
+            WithdrawalRequest({ amount: amount, to: withdrawAddress, requestSubmittedTimestamp: block.timestamp });
+        emit WithdrawalRequested(msg.sender, withdrawAddress, amount);
     }
 
     /**
@@ -134,42 +133,31 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ISponsorshipPaymas
      * @param newWithdrawalDelay The new withdrawal delay in seconds.
      */
     function setWithdrawalDelay(uint256 newWithdrawalDelay) external onlyOwner {
-        withdrawalDelay = newWithdrawalDelay;
+        sponsorWithdrawalDelay = newWithdrawalDelay;
     }
 
     /**
      * @dev Executes the withdrawal request for a given funding account.
-     * @notice Ensures the request was made, respects withdrawal delay, and verifies EntryPoint balance.
+     * @notice Ensures the request was made, checks withdrawal delay
      * @param sponsorAccount The address of the user withdrawing funds.
      */
     function executeWithdrawal(address sponsorAccount) external {
-        uint256 amount = withdrawalRequests[sponsorAccount];
+        WithdrawalRequest memory req = withdrawalRequests[sponsorAccount];
+        if (req.requestSubmittedTimestamp == 0) revert NoWithdrawalRequestSubmitted(sponsorAccount);
 
-        if (amount == 0) revert NoWithdrawalRequest(sponsorAccount); // Fixed check
+        // Note: We could add trusted sponsor accounts with zero withdrawal delay
+        uint256 clearanceTimestamp = req.requestSubmittedTimestamp + sponsorWithdrawalDelay;
+
+        if (block.timestamp < clearanceTimestamp) revert WithdrawalTooSoon(sponsorAccount, clearanceTimestamp);
 
         uint256 currentBalance = sponsorBalances[sponsorAccount];
-        if (currentBalance == 0) revert InsufficientFunds(sponsorAccount, 0, amount);
 
-        // Check delay only if previous withdrawal exists
-        if (block.timestamp < lastWithdrawalTimestamp[sponsorAccount] + withdrawalDelay) {
-            revert WithdrawalTooSoon(sponsorAccount, lastWithdrawalTimestamp[sponsorAccount] + withdrawalDelay);
-        }
-
-        // Ensure amount does not exceed available balance
-        amount = amount > currentBalance ? currentBalance : amount;
-
-        uint256 paymasterDeposit = entryPoint.balanceOf(address(this));
-        if (amount > paymasterDeposit) {
-            revert InsufficientFunds(address(this), paymasterDeposit, amount);
-        }
-
-        entryPoint.withdrawTo(payable(sponsorAccount), amount);
-
-        sponsorBalances[sponsorAccount] -= amount;
+        req.amount = req.amount > currentBalance ? currentBalance : req.amount;
+        if(req.amount == 0) revert CanNotWithdrawZeroAmount();
+        sponsorBalances[sponsorAccount] = currentBalance - req.amount;
         delete withdrawalRequests[sponsorAccount];
-        delete lastWithdrawalTimestamp[sponsorAccount];
-
-        emit WithdrawalExecuted(sponsorAccount, amount);
+        entryPoint.withdrawTo(payable(req.to), req.amount);
+        emit WithdrawalExecuted(sponsorAccount, req.to, req.amount);
     }
 
     /**
