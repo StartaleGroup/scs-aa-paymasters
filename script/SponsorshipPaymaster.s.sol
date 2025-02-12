@@ -31,7 +31,6 @@ contract DeploySponsorshipPaymaster is Script {
         run(salt, owner, signersAddr, feeCollector, minDeposit, withdrawalDelay, unaccountedGas);
     }
 
-    // Todo: Review the need for MultiSigner and update accordingly
     function run(
         uint256 _salt,
         address _owner,

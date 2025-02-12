@@ -24,10 +24,9 @@ interface ISponsorshipPaymaster is ISponsorshipPaymasterEventsAndErrors {
 
     function setUnaccountedGas(uint256 value) external payable;
 
-    // Todo: bring back functionality to be able to withdraw stuck eth and erc20 in the paymaster contract
-    // function withdrawERC20(IERC20 token, address target, uint256 amount) external;
+    function withdrawERC20(IERC20 token, address target, uint256 amount) external;
 
-    // function withdrawEth(address payable recipient, uint256 amount) external payable;
+    function withdrawEth(address payable recipient, uint256 amount) external payable;
 
     function getBalance(address sponsorAccount) external view returns (uint256 balance);
 
