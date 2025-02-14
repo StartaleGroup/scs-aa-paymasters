@@ -159,8 +159,16 @@ contract SponsorshipPaymasterTest is Test {
         address withdrawAddress = makeAddr("withdrawAddress");
 
         vm.startPrank(sponsorAccount);
+        uint256 reqTime = block.timestamp;
         paymaster.requestWithdrawal(withdrawAddress, depositAmount);
         vm.stopPrank();
+
+        (bool exists, uint256 amount, address to, uint256 requestSubmittedTimestamp) =
+            paymaster.getWithdrawalRequest(sponsorAccount);
+        assert(exists);
+        assertEq(amount, depositAmount);
+        assertEq(to, withdrawAddress);
+        assertEq(requestSubmittedTimestamp, reqTime);
 
         vm.warp(block.timestamp + WITHDRAWAL_DELAY + 1);
         uint256 sponsorAccountPaymasterBalanceBefore = paymaster.getBalance(sponsorAccount);

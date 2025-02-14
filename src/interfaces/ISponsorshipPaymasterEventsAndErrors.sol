@@ -22,17 +22,17 @@ interface ISponsorshipPaymasterEventsAndErrors {
     event UserOperationSponsored(bytes32 indexed userOpHash, address indexed user);
     event DepositAdded(address indexed user, uint256 amount);
     event GasBalanceDeducted(address indexed user, uint256 amount, uint256 premium, IPaymaster.PostOpMode mode);
-    event WithdrawalRequested(address indexed sponsorAddress, address indexed withdrawAddress, uint256 indexed amount);
-    event WithdrawalExecuted(address indexed sponsorAddress, address indexed withdrawAddress, uint256 indexed amount);
+    event WithdrawalRequested(address indexed sponsorAddress, address indexed withdrawAddress, uint256 amount);
+    event WithdrawalExecuted(address indexed sponsorAddress, address indexed withdrawAddress, uint256 amount);
     event FeeCollectorChanged(address indexed oldFeeCollector, address indexed newFeeCollector);
     event MinDepositChanged(uint256 oldMinDeposit, uint256 newMinDeposit);
     event RefundProcessed(address indexed user, uint256 amount);
-    event EthWithdrawn(address indexed recipient, uint256 indexed amount);
+    event EthWithdrawn(address indexed recipient, uint256 amount);
     /**
      * @notice Throws when ETH withdrawal fails
      */
 
     error WithdrawalFailed();
 
-    event TokensWithdrawn(address indexed token, address indexed to, uint256 indexed amount, address actor);
+    event TokensWithdrawn(address indexed token, address indexed to, address indexed actor, uint256 amount);
 }

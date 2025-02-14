@@ -108,7 +108,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         }
 
         sponsorBalances[_sponsorAccount] += depositAmount;
-        emit DepositAdded(_sponsorAccount, msg.value);
+        emit DepositAdded(_sponsorAccount, depositAmount);
 
         entryPoint.depositTo{value: depositAmount}(address(this));
     }
@@ -225,7 +225,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
     function _withdrawERC20(IERC20 token, address target, uint256 amount) private {
         if (target == address(0)) revert InvalidWithdrawalAddress();
         SafeTransferLib.safeTransfer(address(token), target, amount);
-        emit TokensWithdrawn(address(token), target, amount, msg.sender);
+        emit TokensWithdrawn(address(token), target, msg.sender, amount);
     }
 
     /**
@@ -373,6 +373,29 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         }
 
         emit GasBalanceDeducted(sponsorAccount, actualGasCost, premium, mode);
+    }
+
+    /**
+     * @dev Retrieves the withdrawal request details for a given sponsor account.
+     * @param sponsorAccount The address of the sponsor.
+     * @return exists Boolean indicating if a withdrawal request exists.
+     * @return amount The amount requested for withdrawal (0 if no request exists).
+     * @return to The address where the withdrawal is requested to be sent (address(0) if no request exists).
+     * @return requestSubmittedTimestamp The timestamp when the withdrawal request was submitted (0 if no request exists).
+     */
+    function getWithdrawalRequest(address sponsorAccount)
+        external
+        view
+        returns (bool exists, uint256 amount, address to, uint256 requestSubmittedTimestamp)
+    {
+        WithdrawalRequest memory request = withdrawalRequests[sponsorAccount];
+        if (request.requestSubmittedTimestamp != 0) {
+            // Request exists
+            return (true, request.amount, request.to, request.requestSubmittedTimestamp);
+        } else {
+            // No request exists, return defaults
+            return (false, 0, address(0), 0);
+        }
     }
 
     /**
