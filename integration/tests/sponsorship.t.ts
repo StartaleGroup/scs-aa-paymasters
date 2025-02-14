@@ -41,8 +41,6 @@ const MOCK_DYNAMIC_ADJUSTMENT = 1;
 const DUMMY_PAYMASTER_VERIFICATION_GAS_LIMIT = BigInt(251165);
 const DUMMY_PAYMASTER_POST_OP_GAS_LIIMIT = BigInt(46908);
 
-// Todo: Review and test with Nish/Shunsuke once
-
 function getPaymasterData(validUntil: number, validAfter: number) {
   const data = {
     sponsorAccount: MOCK_FUNDING_ID,
