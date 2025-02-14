@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import {SoladyOwnable} from "../utils/SoladyOwnable.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import "@account-abstraction/contracts/interfaces/IPaymaster.sol";
-import "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
+import {IPaymaster} from "@account-abstraction/contracts/interfaces/IPaymaster.sol";
+import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import "@account-abstraction/contracts/core/UserOperationLib.sol";
 
 /**
@@ -12,25 +12,16 @@ import "@account-abstraction/contracts/core/UserOperationLib.sol";
  * provides helper methods for staking.
  * Validates that the postOp is called only by the entryPoint.
  */
-abstract contract BasePaymaster is IPaymaster, Ownable {
+abstract contract BasePaymaster is IPaymaster, SoladyOwnable {
     IEntryPoint public immutable entryPoint;
 
     uint256 internal constant PAYMASTER_VALIDATION_GAS_OFFSET = UserOperationLib.PAYMASTER_VALIDATION_GAS_OFFSET;
     uint256 internal constant PAYMASTER_POSTOP_GAS_OFFSET = UserOperationLib.PAYMASTER_POSTOP_GAS_OFFSET;
     uint256 internal constant PAYMASTER_DATA_OFFSET = UserOperationLib.PAYMASTER_DATA_OFFSET;
 
-    constructor(address _owner, IEntryPoint _entryPoint) Ownable(_owner) {
-        _validateEntryPointInterface(_entryPoint);
-        entryPoint = _entryPoint;
-    }
-
-    //sanity check: make sure this EntryPoint was compiled against the same
-    // IEntryPoint of this paymaster
-    function _validateEntryPointInterface(IEntryPoint _entryPoint) internal virtual {
-        require(
-            IERC165(address(_entryPoint)).supportsInterface(type(IEntryPoint).interfaceId),
-            "IEntryPoint interface mismatch"
-        );
+    constructor(address _ownerArg, IEntryPoint _entryPointArg) SoladyOwnable(_ownerArg) {
+        _validateEntryPointInterface(_entryPointArg);
+        entryPoint = _entryPointArg;
     }
 
     /// @inheritdoc IPaymaster
@@ -43,17 +34,6 @@ abstract contract BasePaymaster is IPaymaster, Ownable {
         return _validatePaymasterUserOp(userOp, userOpHash, maxCost);
     }
 
-    /**
-     * Validate a user operation.
-     * @param userOp     - The user operation.
-     * @param userOpHash - The hash of the user operation.
-     * @param maxCost    - The maximum cost of the user operation.
-     */
-    function _validatePaymasterUserOp(PackedUserOperation calldata userOp, bytes32 userOpHash, uint256 maxCost)
-        internal
-        virtual
-        returns (bytes memory context, uint256 validationData);
-
     /// @inheritdoc IPaymaster
     function postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost, uint256 actualUserOpFeePerGas)
         external
@@ -61,29 +41,6 @@ abstract contract BasePaymaster is IPaymaster, Ownable {
     {
         _requireFromEntryPoint();
         _postOp(mode, context, actualGasCost, actualUserOpFeePerGas);
-    }
-
-    /**
-     * Post-operation handler.
-     * (verified to be called only through the entryPoint)
-     * @dev If subclass returns a non-empty context from validatePaymasterUserOp,
-     *      it must also implement this method.
-     * @param mode          - Enum with the following options:
-     *                        opSucceeded - User operation succeeded.
-     *                        opReverted  - User op reverted. The paymaster still has to pay for gas.
-     *                        postOpReverted - never passed in a call to postOp().
-     * @param context       - The context value returned by validatePaymasterUserOp
-     * @param actualGasCost - Actual gas used so far (without this postOp call).
-     * @param actualUserOpFeePerGas - the gas price this UserOp pays. This value is based on the UserOp's maxFeePerGas
-     *                        and maxPriorityFee (and basefee)
-     *                        It is not the same as tx.gasprice, which is what the bundler pays.
-     */
-    function _postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost, uint256 actualUserOpFeePerGas)
-        internal
-        virtual
-    {
-        (mode, context, actualGasCost, actualUserOpFeePerGas); // unused params
-        revert("BasePaymaster: _postOp must be overridden");
     }
 
     /**
@@ -112,13 +69,6 @@ abstract contract BasePaymaster is IPaymaster, Ownable {
     }
 
     /**
-     * Return current paymaster's deposit on the entryPoint.
-     */
-    function getDeposit() public view returns (uint256) {
-        return entryPoint.balanceOf(address(this));
-    }
-
-    /**
      * Unlock the stake, in order to withdraw it.
      * The paymaster can't serve requests once unlocked, until it calls addStake again
      */
@@ -136,9 +86,70 @@ abstract contract BasePaymaster is IPaymaster, Ownable {
     }
 
     /**
+     * Return current paymaster's deposit on the entryPoint.
+     */
+    function getDeposit() public view returns (uint256) {
+        return entryPoint.balanceOf(address(this));
+    }
+
+    /**
+     * Validate a user operation.
+     * @param userOp     - The user operation.
+     * @param userOpHash - The hash of the user operation.
+     * @param maxCost    - The maximum cost of the user operation.
+     */
+    function _validatePaymasterUserOp(PackedUserOperation calldata userOp, bytes32 userOpHash, uint256 maxCost)
+        internal
+        virtual
+        returns (bytes memory context, uint256 validationData);
+
+    /**
+     * Post-operation handler.
+     * (verified to be called only through the entryPoint)
+     * @dev If subclass returns a non-empty context from validatePaymasterUserOp,
+     *      it must also implement this method.
+     * @param mode          - Enum with the following options:
+     *                        opSucceeded - User operation succeeded.
+     *                        opReverted  - User op reverted. The paymaster still has to pay for gas.
+     *                        postOpReverted - never passed in a call to postOp().
+     * @param context       - The context value returned by validatePaymasterUserOp
+     * @param actualGasCost - Actual gas used so far (without this postOp call).
+     * @param actualUserOpFeePerGas - the gas price this UserOp pays. This value is based on the UserOp's maxFeePerGas
+     *                        and maxPriorityFee (and basefee)
+     *                        It is not the same as tx.gasprice, which is what the bundler pays.
+     */
+    function _postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost, uint256 actualUserOpFeePerGas)
+        internal
+        virtual
+    {
+        (mode, context, actualGasCost, actualUserOpFeePerGas); // unused params
+        revert("BasePaymaster: _postOp must be overridden");
+    }
+
+    /**
      * Validate the call is made from a valid entrypoint
      */
     function _requireFromEntryPoint() internal virtual {
         require(msg.sender == address(entryPoint), "Caller is not EntryPoint");
+    }
+
+    //sanity check: make sure this EntryPoint was compiled against the same
+    // IEntryPoint of this paymaster
+    function _validateEntryPointInterface(IEntryPoint _entryPoint) internal virtual {
+        require(
+            IERC165(address(_entryPoint)).supportsInterface(type(IEntryPoint).interfaceId),
+            "IEntryPoint interface mismatch"
+        );
+    }
+
+    /**
+     * Check if address is a contract
+     */
+    function _isContract(address addr) internal view returns (bool) {
+        uint256 size;
+        assembly ("memory-safe") {
+            size := extcodesize(addr)
+        }
+        return size > 0;
     }
 }

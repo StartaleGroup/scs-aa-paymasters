@@ -185,7 +185,7 @@
                 "internalType": "uint48"
             },
             {
-                "name": "dynamicAdjustment",
+                "name": "feeMarkup",
                 "type": "uint32",
                 "internalType": "uint32"
             },
