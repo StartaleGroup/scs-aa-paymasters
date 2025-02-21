@@ -413,7 +413,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         public
         pure
         returns (
-            address sponsorAccount, // Review: call it funding id consistently
+            address sponsorAccount,
             uint48 validUntil,
             uint48 validAfter,
             uint32 feeMarkup,
