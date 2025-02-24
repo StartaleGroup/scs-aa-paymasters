@@ -3,6 +3,7 @@ forge-std/=lib/forge-std/src/
 @openzeppelin/=lib/openzeppelin-contracts/
 @openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 @openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
+@uniswap/swap-router-contracts=lib/swap-router-contracts/
 erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/
 halmos-cheatcodes/=lib/openzeppelin-contracts/lib/halmos-cheatcodes/src/
 solady/=lib/solady/src/

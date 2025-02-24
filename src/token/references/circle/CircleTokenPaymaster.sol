@@ -22,12 +22,12 @@ import {IEntryPoint, CircleBasePaymaster} from "./CircleBasePaymaster.sol";
 import {IWETH} from "@uniswap/swap-router-contracts/contracts/interfaces/IWETH.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {FeeLibV1} from "../../utils/v1/FeeLibV1.sol";
-import {PriceOracleHelper, IOracle} from "../../utils/PriceOracleHelper.sol";
-import {ISwapRouter} from "../../interfaces/ISwapRouter.sol";
-import {IPermit} from "../../interfaces/IPermit.sol";
-import {Denylistable} from "../../utils/Denylistable.sol";
-import {Rescuable} from "../../utils/Rescuable.sol";
+import {FeeLibV1} from "./FeeLibV1.sol";
+import {CirclePriceOracleHelper, IOracle} from "./CirclePriceOracleHelper.sol";
+import {ISwapRouter} from "./ISwapRouter.sol";
+import {IPermit} from "./IPermit.sol";
+import {Denylistable} from "./Denylistable.sol";
+import {Rescuable} from "./Rescuable.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {UserOperationLib} from "@account-abstraction/contracts/core/UserOperationLib.sol";
 
@@ -38,7 +38,7 @@ uint256 constant PAYMASTER_PERMIT_SIGNATURE_OFFSET = PAYMASTER_PERMIT_AMOUNT_OFF
 /**
  * @notice A token paymaster that allows compatible SCAs to pay for gas using ERC-20 tokens.
  */
-contract TokenPaymasterV1 is BasePaymaster, PriceOracleHelper, Denylistable, Rescuable {
+contract CircleTokenPaymaster is CircleBasePaymaster, CirclePriceOracleHelper, Denylistable, Rescuable {
     using SafeERC20 for IERC20;
     using UserOperationLib for PackedUserOperation;
 
@@ -194,8 +194,8 @@ contract TokenPaymasterV1 is BasePaymaster, PriceOracleHelper, Denylistable, Res
 
     // for immutable values in implementations
     constructor(IEntryPoint _newEntryPoint, IERC20Metadata _token, IWETH _wrappedNativeToken)
-        BasePaymaster(_newEntryPoint)
-        PriceOracleHelper(_token.decimals())
+        CircleBasePaymaster(_newEntryPoint)
+        CirclePriceOracleHelper(_token.decimals())
     {
         token = IERC20(_token);
         wrappedNativeToken = _wrappedNativeToken;
