@@ -36,7 +36,8 @@ const MOCK_FUNDING_ID = "0x0000000000000000000000000000000000001234" as Address;
 const MOCK_VALID_UNTIL = 0;
 const MOCK_VALID_AFTER = 0;
 const MOCK_SIG = "0x1234";
-const MOCK_DYNAMIC_ADJUSTMENT = 1;
+// Need this to pass condition on the paymaster contract
+const MOCK_DYNAMIC_ADJUSTMENT = 1100000;
 
 const DUMMY_PAYMASTER_VERIFICATION_GAS_LIMIT = BigInt(251165);
 const DUMMY_PAYMASTER_POST_OP_GAS_LIIMIT = BigInt(46908);
@@ -54,6 +55,8 @@ function getPaymasterData(validUntil: number, validAfter: number) {
     [data.sponsorAccount, data.validUntil, data.validAfter, data.feeMarkup]
   );
 }
+
+// Todo: Convert this to hardhat based tests so that we can attach EP address and can interact directly with artifacts
 
 describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
   let paymasterAddress: Address;
@@ -77,13 +80,23 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
   let paymasterOwnerAccount: PrivateKeyAccount;
 
   async function fillPaymasterDataSignature(
-    userOperation: UserOperation
+    userOperation: UserOperation,
+    fundingId: Address,
+    validUntil: number,
+    validAfter: number,
+    feeMarkup: number
   ): Promise<UserOperation> {
     const hash = await publicClient.readContract({
       address: paymasterAddress,
       abi: sponsorshipPaymasterAbi,
       functionName: "getHash",
-      args: [toPackedUserOperation(userOperation)],
+      args: [
+        toPackedUserOperation(userOperation),
+        fundingId,
+        validUntil,
+        validAfter,
+        feeMarkup,
+      ],
     });
     const sig = await walletClient.signMessage({
       account: paymasterSignerAccount,
@@ -101,7 +114,7 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
 
     paymasterAddress = process.env.PAYMASTER_ADDRESS as Address;
     entryPointAddress = process.env.ENTRY_POINT_ADDRESS as Address;
-    simpleAccountFactoryAddress = process.env.SINPLE_ACCOUNT_FACTORY as Address;
+    simpleAccountFactoryAddress = process.env.SIMPLE_ACCOUNT_FACTORY as Address;
     counterAddress = process.env.COUNTER_ADDRESS as Address;
 
     // Simple Account Owner
@@ -156,7 +169,6 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
     });
 
     const [defaultWalletAddress] = await walletClient.getAddresses();
-
     // @ts-ignore
     await walletClient.sendTransaction({
       account: paymasterOwnerAccount,
@@ -181,6 +193,14 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
         args: [paymasterAddress],
       }),
     });
+
+    const currentDeposit = await publicClient.readContract({
+      address: paymasterAddress,
+      abi: sponsorshipPaymasterAbi,
+      functionName: "getBalance",
+      args: [MOCK_FUNDING_ID],
+    });
+    console.log("currentDeposit ", currentDeposit);
   });
 
   describe("#parsePaymasterAndData", () => {
@@ -207,6 +227,7 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
           MOCK_SIG,
         ]
       );
+      console.log("paymasterAndData ", paymasterAndData);
 
       const res = await publicClient.readContract({
         address: paymasterAddress,
@@ -219,7 +240,9 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
       expect(res[1]).to.be.equal(MOCK_VALID_UNTIL);
       expect(res[2]).to.be.equal(MOCK_VALID_AFTER);
       expect(res[3]).to.be.equal(MOCK_DYNAMIC_ADJUSTMENT);
-      expect(res[4]).to.be.equal(MOCK_SIG);
+      expect(res[4]).to.be.equal(BigInt(1500));
+      expect(res[5]).to.be.equal(BigInt(1500));
+      expect(res[6]).to.be.equal(MOCK_SIG);
     });
   });
 
@@ -270,14 +293,29 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
         ],
       });
 
+      // console.log("baseUserOp ", baseUserOp);
+
       // Prepare paymaster data
-      const paymasterData = getPaymasterData(0, 0); // no expiration
+      const paymasterData = getPaymasterData(
+        MOCK_VALID_UNTIL,
+        MOCK_VALID_AFTER
+      );
+
+      // Todo: Review type complaints
       baseUserOp.paymaster = paymasterAddress;
       baseUserOp.paymasterData = paymasterData;
       baseUserOp.paymasterVerificationGasLimit =
         DUMMY_PAYMASTER_VERIFICATION_GAS_LIMIT;
       baseUserOp.paymasterPostOpGasLimit = DUMMY_PAYMASTER_POST_OP_GAS_LIIMIT;
-      baseUserOp = await fillPaymasterDataSignature(baseUserOp);
+
+      // Todo: Review type complaints
+      baseUserOp = await fillPaymasterDataSignature(
+        baseUserOp,
+        MOCK_FUNDING_ID,
+        MOCK_VALID_UNTIL,
+        MOCK_VALID_AFTER,
+        MOCK_DYNAMIC_ADJUSTMENT
+      );
 
       // for gas estimation, use dummy signarure
       // What's dummy signature? useful links, https://www.alchemy.com/blog/erc-4337-gas-estimation#user-operation-flow, https://www.alchemy.com/blog/dummy-signatures-and-gas-token-transfers#how-to-calculate-dummy-signature-values
@@ -288,6 +326,7 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
         signature: dummySignature,
       });
 
+      // Todo: Review type complaints
       let userOp = {
         ...baseUserOp,
         callGasLimit: estimatedGas.callGasLimit,
@@ -298,7 +337,13 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
         paymasterData: paymasterData, // reset paymaster data to remove previous signature for gas estimation
       };
       // @ts-ignore
-      userOp = await fillPaymasterDataSignature(userOp);
+      userOp = await fillPaymasterDataSignature(
+        userOp,
+        MOCK_FUNDING_ID,
+        MOCK_VALID_UNTIL,
+        MOCK_VALID_AFTER,
+        MOCK_DYNAMIC_ADJUSTMENT
+      );
 
       // Send User Operation
       // @ts-ignore
