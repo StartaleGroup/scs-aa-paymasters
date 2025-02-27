@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {IPaymaster} from "@account-abstraction/contracts/interfaces/IPaymaster.sol";
 
-// Todo: review indexed fields. make as many indexed
+
 interface ISponsorshipPaymasterEventsAndErrors {
     error PaymasterSignatureLengthInvalid();
     error InsufficientFunds(address user, uint256 balance, uint256 required);
