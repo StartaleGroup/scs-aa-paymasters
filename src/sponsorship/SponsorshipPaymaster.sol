@@ -346,7 +346,10 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
             + _userOp.unpackPaymasterVerificationGasLimit();
         uint256 executionGasLimit = _userOp.unpackCallGasLimit() + _userOp.unpackPostOpGasLimit();
 
-        return (abi.encode(sponsorAccount, feeMarkup, effectiveCost, preOpGasApproximation, executionGasLimit), validationData);
+        return (
+            abi.encode(sponsorAccount, feeMarkup, effectiveCost, preOpGasApproximation, executionGasLimit),
+            validationData
+        );
     }
 
     /**
@@ -361,8 +364,13 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         internal
         override
     {
-        (address sponsorAccount, uint32 feeMarkup, uint256 prechargedAmount, uint256 preOpGasApproximation, uint256 executionGasLimit) =
-            abi.decode(context, (address, uint32, uint256, uint256, uint256));
+        (
+            address sponsorAccount,
+            uint32 feeMarkup,
+            uint256 prechargedAmount,
+            uint256 preOpGasApproximation,
+            uint256 executionGasLimit
+        ) = abi.decode(context, (address, uint32, uint256, uint256, uint256));
 
         uint256 actualGas = actualGasCost / actualUserOpFeePerGas;
 
@@ -375,7 +383,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         if (executionGasLimit > executionGasUsed) {
             expectedPenaltyGas = (executionGasLimit - executionGasUsed) * 10 / 100;
         }
-        // Review: could emit expected penalty gas    
+        // Review: could emit expected penalty gas
 
         // Include unaccountedGas since EP doesn't include this in actualGasCost
         // unaccountedGas = postOpGas + EP overhead gas

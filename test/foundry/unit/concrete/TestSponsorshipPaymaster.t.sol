@@ -2,13 +2,12 @@
 pragma solidity ^0.8.28;
 
 import "../../TestBase.sol";
-import { ISponsorshipPaymaster } from "../../../../src/interfaces/ISponsorshipPaymaster.sol";
-import { SponsorshipPaymaster } from "../../../../src/sponsorship/SponsorshipPaymaster.sol";
-import { ISponsorshipPaymasterEventsAndErrors } from "../../../../src/interfaces/ISponsorshipPaymasterEventsAndErrors.sol";
+import {ISponsorshipPaymaster} from "../../../../src/interfaces/ISponsorshipPaymaster.sol";
+import {SponsorshipPaymaster} from "../../../../src/sponsorship/SponsorshipPaymaster.sol";
+import {ISponsorshipPaymasterEventsAndErrors} from "../../../../src/interfaces/ISponsorshipPaymasterEventsAndErrors.sol";
 import "@account-abstraction/contracts/interfaces/IStakeManager.sol";
 
 contract TestSponsorshipPaymaster is TestBase {
-
     SponsorshipPaymaster public sponsorshipPaymaster;
 
     uint256 public constant WITHDRAWAL_DELAY = 3600;
@@ -73,7 +72,7 @@ contract TestSponsorshipPaymaster is TestBase {
     // test_executeWithdrawalRequest_Fails_with_NoRequestSubmitted
     // test_cancelWithdrawalRequest_Success
     // test_submitWithdrawalRequest_Happy_Scenario
-    // test_executeWithdrawalRequest_Withdraws_WhateverIsLeft 
+    // test_executeWithdrawalRequest_Withdraws_WhateverIsLeft
     // test_depositFor_RevertsIf_DepositIsLessThanMinDeposit
 
     function test_SetUnaccountedGas() external prankModifier(PAYMASTER_OWNER.addr) {
@@ -92,7 +91,7 @@ contract TestSponsorshipPaymaster is TestBase {
         assertEq(sponsorAccountBalance, 0 ether);
         vm.expectEmit(true, true, false, true, address(sponsorshipPaymaster));
         emit ISponsorshipPaymasterEventsAndErrors.DepositAdded(SPONSOR_ACCOUNT.addr, depositAmount);
-        sponsorshipPaymaster.depositFor{ value: depositAmount }(SPONSOR_ACCOUNT.addr);
+        sponsorshipPaymaster.depositFor{value: depositAmount}(SPONSOR_ACCOUNT.addr);
         sponsorAccountBalance = sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr);
         assertEq(sponsorAccountBalance, depositAmount);
     }
@@ -100,12 +99,12 @@ contract TestSponsorshipPaymaster is TestBase {
     function getGasLimit(PackedUserOperation calldata userOp) public pure returns (uint256) {
         uint256 PAYMASTER_POSTOP_GAS_OFFSET = 36;
         uint256 PAYMASTER_DATA_OFFSET = 52;
-        return uint128(uint256(userOp.accountGasLimits)) +
-            uint128(bytes16(userOp.paymasterAndData[PAYMASTER_POSTOP_GAS_OFFSET : PAYMASTER_DATA_OFFSET]));
-   }
+        return uint128(uint256(userOp.accountGasLimits))
+            + uint128(bytes16(userOp.paymasterAndData[PAYMASTER_POSTOP_GAS_OFFSET:PAYMASTER_DATA_OFFSET]));
+    }
 
-   function test_ValidatePaymasterAndPostOpWithoutPriceMarkup() external {
-        sponsorshipPaymaster.depositFor{ value: 10 ether }(SPONSOR_ACCOUNT.addr);
+    function test_ValidatePaymasterAndPostOpWithoutPriceMarkup() external {
+        sponsorshipPaymaster.depositFor{value: 10 ether}(SPONSOR_ACCOUNT.addr);
 
         startPrank(PAYMASTER_OWNER.addr);
         sponsorshipPaymaster.setUnaccountedGas(50_000);
@@ -113,7 +112,8 @@ contract TestSponsorshipPaymaster is TestBase {
 
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
         // fee markup of 1e6
-        (PackedUserOperation memory userOp, bytes32 userOpHash) = createUserOpWithSponsorshipPaymaster(ALICE, sponsorshipPaymaster, 1e6, 55_000);
+        (PackedUserOperation memory userOp, bytes32 userOpHash) =
+            createUserOpWithSponsorshipPaymaster(ALICE, sponsorshipPaymaster, 1e6, 55_000);
         ops[0] = userOp;
 
         uint256 initialBundlerBalance = BUNDLER.addr.balance;
@@ -123,7 +123,9 @@ contract TestSponsorshipPaymaster is TestBase {
 
         // submit userops
         vm.expectEmit(true, false, false, false, address(sponsorshipPaymaster));
-        emit ISponsorshipPaymasterEventsAndErrors.GasBalanceDeducted(SPONSOR_ACCOUNT.addr, 0, 0, IPaymaster.PostOpMode.opSucceeded);
+        emit ISponsorshipPaymasterEventsAndErrors.GasBalanceDeducted(
+            SPONSOR_ACCOUNT.addr, 0, 0, IPaymaster.PostOpMode.opSucceeded
+        );
         startPrank(BUNDLER.addr);
         ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
         stopPrank();
@@ -132,7 +134,7 @@ contract TestSponsorshipPaymaster is TestBase {
         // calculateAndAssertAdjustments(...
     }
 
-    // Todo: 
+    // Todo:
     // test_ValidatePaymasterAndPostOpWithPriceMarkup
     // test_ValidatePaymasterAndPostOpWithPriceMarkup_NonEmptyCalldata
     // test_RevertIf_ValidatePaymasterUserOpWithIncorrectSignatureLength
@@ -145,4 +147,3 @@ contract TestSponsorshipPaymaster is TestBase {
     // test_RevertIf_WithdrawErc20ToZeroAddress
     // test_ParsePaymasterAndData
 }
-

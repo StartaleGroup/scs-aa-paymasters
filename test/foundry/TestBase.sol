@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { Test } from "forge-std/Test.sol";
-import { Vm } from "forge-std/Vm.sol";
-import { console2 } from "forge-std/console2.sol";
-import { CheatCodes } from "./utils/CheatCodes.sol";
+import {Test} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {console2} from "forge-std/console2.sol";
+import {CheatCodes} from "./utils/CheatCodes.sol";
 import "./utils/TestHelper.sol";
 
 import "solady/utils/ECDSA.sol";
 
 import "account-abstraction/core/UserOperationLib.sol";
 
-import { IAccount } from "account-abstraction/interfaces/IAccount.sol";
-import { Exec } from "account-abstraction/utils/Exec.sol";
-import { IPaymaster } from "account-abstraction/interfaces/IPaymaster.sol";
+import {IAccount} from "account-abstraction/interfaces/IAccount.sol";
+import {Exec} from "account-abstraction/utils/Exec.sol";
+import {IPaymaster} from "account-abstraction/interfaces/IPaymaster.sol";
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import { SponsorshipPaymaster } from "../../src/sponsorship/SponsorshipPaymaster.sol";
+import {SponsorshipPaymaster} from "../../src/sponsorship/SponsorshipPaymaster.sol";
 
 // Notice: We can add a base contract for required events and errors for the paymasters
 abstract contract TestBase is CheatCodes, TestHelper {
@@ -27,7 +27,7 @@ abstract contract TestBase is CheatCodes, TestHelper {
     // Note: addresses valid for Base and Soneium, can be different for other chains
     address constant WRAPPED_NATIVE_ADDRESS = address(0x4200000000000000000000000000000000000006);
 
-    // SWAP_ROUTER_ADDRESS 
+    // SWAP_ROUTER_ADDRESS
 
     uint32 internal constant _PRICE_MARKUP_DENOMINATOR = 1e6;
 
@@ -52,8 +52,8 @@ abstract contract TestBase is CheatCodes, TestHelper {
     struct StartaleTokenPaymasterData {
         uint128 paymasterValGasLimit;
         uint128 paymasterPostOpGasLimit;
-        // ...
     }
+    // ...
 
     // Used to buffer user op gas limits
     // GAS_LIMIT = (ESTIMATED_GAS * GAS_BUFFER_RATIO) / 100
@@ -88,9 +88,7 @@ abstract contract TestBase is CheatCodes, TestHelper {
         SPONSOR_ACCOUNT = createAndFundWallet("SPONSOR_ACCOUNT", 1000 ether);
     }
 
-    function estimateUserOpGasCosts(
-        PackedUserOperation memory userOp
-    )
+    function estimateUserOpGasCosts(PackedUserOperation memory userOp)
         internal
         prankModifier(ENTRYPOINT_ADDRESS)
         returns (uint256 verificationGasUsed, uint256 callGasUsed, uint256 verificationGasLimit, uint256 callGasLimit)
@@ -144,10 +142,7 @@ abstract contract TestBase is CheatCodes, TestHelper {
         SponsorshipPaymaster paymaster,
         uint32 feeMarkup,
         uint128 postOpGasLimitOverride
-    )
-        internal
-        returns (PackedUserOperation memory userOp, bytes32 userOpHash)
-    {
+    ) internal returns (PackedUserOperation memory userOp, bytes32 userOpHash) {
         // Create userOp with no gas estimates
         userOp = buildUserOpWithCalldata(sender, "", 0, 0);
 
@@ -159,7 +154,8 @@ abstract contract TestBase is CheatCodes, TestHelper {
             validAfter: uint48(block.timestamp),
             feeMarkup: feeMarkup
         });
-        (userOp.paymasterAndData,) = generateAndSignSponsorshipPaymasterData(userOp, PAYMASTER_SIGNER_A, paymaster, pmData);
+        (userOp.paymasterAndData,) =
+            generateAndSignSponsorshipPaymasterData(userOp, PAYMASTER_SIGNER_A, paymaster, pmData);
         userOp.signature = signUserOp(sender, userOp);
 
         // Estimate account gas limits
@@ -183,7 +179,8 @@ abstract contract TestBase is CheatCodes, TestHelper {
             feeMarkup
         );
 
-        (userOp.paymasterAndData,) = generateAndSignSponsorshipPaymasterData(userOp, PAYMASTER_SIGNER_A, paymaster, pmDataNew);
+        (userOp.paymasterAndData,) =
+            generateAndSignSponsorshipPaymasterData(userOp, PAYMASTER_SIGNER_A, paymaster, pmDataNew);
         userOp.signature = signUserOp(sender, userOp);
         userOpHash = ENTRYPOINT.getUserOpHash(userOp);
     }
@@ -200,11 +197,7 @@ abstract contract TestBase is CheatCodes, TestHelper {
         Vm.Wallet memory signer,
         SponsorshipPaymaster paymaster,
         SponsorshipPaymasterData memory pmData
-    )
-        internal
-        view
-        returns (bytes memory finalPmData, bytes memory signature)
-    {
+    ) internal view returns (bytes memory finalPmData, bytes memory signature) {
         // Initial paymaster data with zero signature
         userOp.paymasterAndData = abi.encodePacked(
             address(paymaster),
@@ -246,9 +239,13 @@ abstract contract TestBase is CheatCodes, TestHelper {
         ) * 10 * userOp.unpackMaxFeePerGas() / 100;
     }
 
-    function getRealPenalty(PackedUserOperation calldata userOp, uint256 gasValue, uint256 gasPrice) public pure returns (uint256) {
+    function getRealPenalty(PackedUserOperation calldata userOp, uint256 gasValue, uint256 gasPrice)
+        public
+        pure
+        returns (uint256)
+    {
         uint256 gasLimit = uint128(uint256(userOp.accountGasLimits))
-                + uint128(bytes16(userOp.paymasterAndData[_PAYMASTER_POSTOP_GAS_OFFSET:_PAYMASTER_DATA_OFFSET]));
+            + uint128(bytes16(userOp.paymasterAndData[_PAYMASTER_POSTOP_GAS_OFFSET:_PAYMASTER_DATA_OFFSET]));
 
         uint256 penalty = (gasLimit - gasValue) * 10 * gasPrice / 100;
         return penalty;

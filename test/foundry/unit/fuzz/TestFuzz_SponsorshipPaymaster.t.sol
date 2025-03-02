@@ -2,13 +2,12 @@
 pragma solidity ^0.8.28;
 
 import "../../TestBase.sol";
-import { ISponsorshipPaymaster } from "../../../../src/interfaces/ISponsorshipPaymaster.sol";
-import { SponsorshipPaymaster } from "../../../../src/sponsorship/SponsorshipPaymaster.sol";
-import { ISponsorshipPaymasterEventsAndErrors } from "../../../../src/interfaces/ISponsorshipPaymasterEventsAndErrors.sol";
+import {ISponsorshipPaymaster} from "../../../../src/interfaces/ISponsorshipPaymaster.sol";
+import {SponsorshipPaymaster} from "../../../../src/sponsorship/SponsorshipPaymaster.sol";
+import {ISponsorshipPaymasterEventsAndErrors} from "../../../../src/interfaces/ISponsorshipPaymasterEventsAndErrors.sol";
 import "@account-abstraction/contracts/interfaces/IStakeManager.sol";
 
 contract TestFuzz_SponsorshipPaymaster is TestBase {
-
     SponsorshipPaymaster public sponsorshipPaymaster;
 
     uint256 public constant WITHDRAWAL_DELAY = 3600;
@@ -39,7 +38,7 @@ contract TestFuzz_SponsorshipPaymaster is TestBase {
         assertEq(dappPaymasterBalance, 0 ether);
         vm.expectEmit(true, true, false, true, address(sponsorshipPaymaster));
         emit ISponsorshipPaymasterEventsAndErrors.DepositAdded(SPONSOR_ACCOUNT.addr, depositAmount);
-        sponsorshipPaymaster.depositFor{ value: depositAmount }(SPONSOR_ACCOUNT.addr);
+        sponsorshipPaymaster.depositFor{value: depositAmount}(SPONSOR_ACCOUNT.addr);
         dappPaymasterBalance = sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr);
         assertEq(dappPaymasterBalance, depositAmount);
     }

@@ -3,10 +3,10 @@ pragma solidity ^0.8.28;
 
 import "solady/utils/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import { EntryPoint } from "account-abstraction/core/EntryPoint.sol";
-import { IEntryPoint } from "account-abstraction/interfaces/IEntryPoint.sol";
-import { PackedUserOperation } from "account-abstraction/interfaces/PackedUserOperation.sol";
-import { SimpleAccountFactory, SimpleAccount } from "@account-abstraction/contracts/samples/SimpleAccountFactory.sol";
+import {EntryPoint} from "account-abstraction/core/EntryPoint.sol";
+import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
+import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
+import {SimpleAccountFactory, SimpleAccount} from "@account-abstraction/contracts/samples/SimpleAccountFactory.sol";
 import "./CheatCodes.sol";
 
 /// @title Execution
@@ -20,9 +20,7 @@ struct Execution {
     bytes callData;
 }
 
-
 contract TestHelper is CheatCodes {
-
     // -----------------------------------------
     // State Variables
     // -----------------------------------------
@@ -38,14 +36,12 @@ contract TestHelper is CheatCodes {
     address internal CHARLIE_ADDRESS;
     address payable internal BUNDLER_ADDRESS;
 
-
     SimpleAccount internal BOB_ACCOUNT;
     SimpleAccount internal ALICE_ACCOUNT;
     SimpleAccount internal CHARLIE_ACCOUNT;
 
     IEntryPoint internal ENTRYPOINT;
     SimpleAccountFactory internal FACTORY;
-
 
     // -----------------------------------------
     // Setup Functions
@@ -72,24 +68,27 @@ contract TestHelper is CheatCodes {
     /// @param deposit The deposit amount
     /// @param index The salt index for the account
     /// @return The deployed Simple account
-    function deploySimpleAccount(Vm.Wallet memory wallet, uint256 deposit, uint256 index) internal returns (SimpleAccount) {
+    function deploySimpleAccount(Vm.Wallet memory wallet, uint256 deposit, uint256 index)
+        internal
+        returns (SimpleAccount)
+    {
         address payable accountAddress = calculateAccountAddress(wallet.addr, index);
         bytes memory initCode = buildInitCode(wallet.addr, index);
 
         PackedUserOperation[] memory userOps = new PackedUserOperation[](1);
         userOps[0] = buildUserOpWithInitAndCalldata(wallet, initCode, "", index, 0);
 
-        ENTRYPOINT.depositTo{ value: deposit }(address(accountAddress));
+        ENTRYPOINT.depositTo{value: deposit}(address(accountAddress));
         ENTRYPOINT.handleOps(userOps, payable(wallet.addr));
         assertTrue(SimpleAccount(accountAddress).owner() == wallet.addr);
         return SimpleAccount(accountAddress);
     }
 
-     /// @notice Deploys SimpleAccount accounts for predefined wallets
+    /// @notice Deploys SimpleAccount accounts for predefined wallets
     function deploySimpleAccountForPredefinedWallets() internal {
         BOB_ACCOUNT = deploySimpleAccount(BOB, 100 ether, 0);
         vm.label(address(BOB_ACCOUNT), "BOB_ACCOUNT");
-        ALICE_ACCOUNT = deploySimpleAccount(ALICE, 100 ether,0);
+        ALICE_ACCOUNT = deploySimpleAccount(ALICE, 100 ether, 0);
         vm.label(address(ALICE_ACCOUNT), "ALICE_ACCOUNT");
         CHARLIE_ACCOUNT = deploySimpleAccount(CHARLIE, 100 ether, 0);
         vm.label(address(CHARLIE_ACCOUNT), "CHARLIE_ACCOUNT");
@@ -119,7 +118,7 @@ contract TestHelper is CheatCodes {
         ENTRYPOINT = IEntryPoint(0x0000000071727De22E5E9d8BAf0edAc6f37da032);
         // ACCOUNT_IMPLEMENTATION = new SimpleAccount(address(ENTRYPOINT));
         // Factory deploys it's own implementation
-        FACTORY = new SimpleAccountFactory(ENTRYPOINT); 
+        FACTORY = new SimpleAccountFactory(ENTRYPOINT);
     }
 
     // -----------------------------------------
@@ -133,7 +132,7 @@ contract TestHelper is CheatCodes {
     function calculateAccountAddress(
         address owner,
         uint256 index // salt
-    ) internal virtual view returns(address payable account){
+    ) internal view virtual returns (address payable account) {
         return payable(FACTORY.getAddress(owner, index));
     }
 
@@ -142,11 +141,10 @@ contract TestHelper is CheatCodes {
     /// @param index Salt index for the account
     /// @return initCode The prepared init code
     /// @notice we can override this to meet the needs of a different 7579 account
-    function buildInitCode(address ownerAddress, uint256 index) internal virtual view returns (bytes memory initCode) {
+    function buildInitCode(address ownerAddress, uint256 index) internal view virtual returns (bytes memory initCode) {
         // Prepend the factory address to the encoded function call to form the initCode
         initCode = abi.encodePacked(
-            address(FACTORY),
-            abi.encodeWithSelector(FACTORY.createAccount.selector, ownerAddress, index)
+            address(FACTORY), abi.encodeWithSelector(FACTORY.createAccount.selector, ownerAddress, index)
         );
     }
 
@@ -155,7 +153,12 @@ contract TestHelper is CheatCodes {
     /// @param nonce The nonce
     /// @return userOp The built user operation
     /// @notice we could add means to be able to pass overriden values for gas limits
-    function buildPackedUserOp(address sender, uint256 nonce) internal virtual pure returns (PackedUserOperation memory) {
+    function buildPackedUserOp(address sender, uint256 nonce)
+        internal
+        pure
+        virtual
+        returns (PackedUserOperation memory)
+    {
         return PackedUserOperation({
             sender: sender,
             nonce: nonce,
@@ -171,18 +174,14 @@ contract TestHelper is CheatCodes {
 
     /// @notice Prepares a packed user operation with specified parameters (execution for simple account)
     /// @param signer The wallet to sign the operation
-    /// @param account The Nexus account
+    /// @param account Simple account
     /// @param executions The executions to include
     /// @return userOps The prepared packed user operations
     /// @notice we can make a util to prepare calldata for ERC7579 account
-    function buildPackedUserOperation(
-        Vm.Wallet memory signer,
-        SimpleAccount account,
-        Execution[] memory executions
-    )
+    function buildPackedUserOperation(Vm.Wallet memory signer, SimpleAccount account, Execution[] memory executions)
         internal
-        virtual
         view
+        virtual
         returns (PackedUserOperation[] memory userOps)
     {
         // Initialize the userOps array with one operation
@@ -194,8 +193,10 @@ contract TestHelper is CheatCodes {
         uint256 length = executions.length;
         bytes memory callData;
 
-        if(length == 1) {
-            callData = abi.encodeWithSelector(SimpleAccount.execute.selector, executions[0].target, executions[0].value, executions[0].callData);
+        if (length == 1) {
+            callData = abi.encodeWithSelector(
+                SimpleAccount.execute.selector, executions[0].target, executions[0].value, executions[0].callData
+            );
         } else if (length > 1) {
             address[] memory targets = new address[](length);
             uint256[] memory values = new uint256[](length);
@@ -208,16 +209,15 @@ contract TestHelper is CheatCodes {
             }
 
             callData = abi.encodeWithSelector(SimpleAccount.executeBatch.selector, targets, values, calldatas);
-
         } else {
             revert("Executions array cannot be empty");
         }
 
-       userOps[0].callData = callData;
-       // Sign the operation
-       bytes32 userOpHash = ENTRYPOINT.getUserOpHash(userOps[0]);
-       userOps[0].signature = signMessage(signer, userOpHash);
-       return userOps;
+        userOps[0].callData = callData;
+        // Sign the operation
+        bytes32 userOpHash = ENTRYPOINT.getUserOpHash(userOps[0]);
+        userOps[0].signature = signMessage(signer, userOpHash);
+        return userOps;
     }
 
     /// @notice Prepares a user operation with call data for a simple account
@@ -226,15 +226,10 @@ contract TestHelper is CheatCodes {
     /// @param index The salt index for the account
     /// @param nonceKey The nonce key for the account
     /// @return userOp The prepared user operation
-    function buildUserOpWithCalldata(
-        Vm.Wallet memory wallet,
-        bytes memory callData,
-        uint256 index,
-        uint192 nonceKey
-    )
+    function buildUserOpWithCalldata(Vm.Wallet memory wallet, bytes memory callData, uint256 index, uint192 nonceKey)
         internal
-        virtual
         view
+        virtual
         returns (PackedUserOperation memory userOp)
     {
         address payable account = calculateAccountAddress(wallet.addr, index);
@@ -258,12 +253,7 @@ contract TestHelper is CheatCodes {
         bytes memory callData,
         uint256 index,
         uint192 nonceKey
-    )
-        internal
-        virtual
-        view
-        returns (PackedUserOperation memory userOp)
-    {
+    ) internal view virtual returns (PackedUserOperation memory userOp) {
         userOp = buildUserOpWithCalldata(wallet, callData, index, nonceKey);
         userOp.initCode = initCode;
         bytes memory signature = signUserOp(wallet, userOp);
@@ -272,23 +262,20 @@ contract TestHelper is CheatCodes {
 
     /// @notice Retrieves the nonce for a given account and validator
     /// @param account The account address
-    function getNonce(address account, uint192 key) internal virtual view returns (uint256 nonce) {
+    function getNonce(address account, uint192 key) internal view virtual returns (uint256 nonce) {
         nonce = ENTRYPOINT.getNonce(address(account), key);
     }
 
     /// @notice Composes the nonce key
-    function makeNonceKey() internal virtual pure returns (uint192 key) {
-       return 0; // for simple account
+    function makeNonceKey() internal pure virtual returns (uint192 key) {
+        return 0; // for simple account
     }
 
     /// @notice Signs a user operation
     /// @param wallet The wallet to sign the operation
     /// @param userOp The user operation to sign
     /// @return The signed user operation
-    function signUserOp(
-        Vm.Wallet memory wallet,
-        PackedUserOperation memory userOp
-    )
+    function signUserOp(Vm.Wallet memory wallet, PackedUserOperation memory userOp)
         internal
         view
         returns (bytes memory)
@@ -308,8 +295,6 @@ contract TestHelper is CheatCodes {
         vm.etch(newAddress, originalAddress.code);
     }
 
-
-
     /// @notice Signs a message and packs r, s, v into bytes
     /// @param wallet The wallet to sign the message
     /// @param messageHash The hash of the message to sign
@@ -319,7 +304,6 @@ contract TestHelper is CheatCodes {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(wallet.privateKey, userOpHash);
         signature = abi.encodePacked(r, s, v);
     }
-
 
     /// @dev Returns a random non-zero address.
     /// @notice Returns a random non-zero address
@@ -366,7 +350,7 @@ contract TestHelper is CheatCodes {
 
             // Do some biased sampling for more robust tests.
             // prettier-ignore
-            for { } 1 { } {
+            for {} 1 {} {
                 let d := byte(0, r)
                 // With a 1/256 chance, randomly set `r` to any of 0,1,2.
                 if iszero(d) {
@@ -402,7 +386,7 @@ contract TestHelper is CheatCodes {
     /// @param sa The smart account address
     /// @param prefundAmount The amount to pre-fund
     function prefundSmartAccountAndAssertSuccess(address sa, uint256 prefundAmount) internal {
-        (bool res,) = sa.call{ value: prefundAmount }(""); // Pre-funding the account contract
+        (bool res,) = sa.call{value: prefundAmount}(""); // Pre-funding the account contract
         assertTrue(res, "Pre-funding account should succeed");
     }
 
@@ -424,12 +408,7 @@ contract TestHelper is CheatCodes {
     /// @param target The target contract address
     /// @param value The value to be sent with the call
     /// @param callData The calldata for the call
-    function measureAndLogGasEOA(
-        string memory description,
-        address target,
-        uint256 value,
-        bytes memory callData
-    )
+    function measureAndLogGasEOA(string memory description, address target, uint256 value, bytes memory callData)
         internal
     {
         uint256 calldataCost = 0;
@@ -444,7 +423,7 @@ contract TestHelper is CheatCodes {
         uint256 baseGas = 21_000;
 
         uint256 initialGas = gasleft();
-        (bool res,) = target.call{ value: value }(callData);
+        (bool res,) = target.call{value: value}(callData);
         uint256 gasUsed = initialGas - gasleft() + baseGas + calldataCost;
         assertTrue(res);
         emit log_named_uint(description, gasUsed);
@@ -477,10 +456,7 @@ contract TestHelper is CheatCodes {
     /// @param userOps The user operations to handle
     /// @param refundReceiver The address to receive the gas refund
     /// @return gasUsed The amount of gas used
-    function handleUserOpAndMeasureGas(
-        PackedUserOperation[] memory userOps,
-        address refundReceiver
-    )
+    function handleUserOpAndMeasureGas(PackedUserOperation[] memory userOps, address refundReceiver)
         internal
         returns (uint256 gasUsed)
     {
