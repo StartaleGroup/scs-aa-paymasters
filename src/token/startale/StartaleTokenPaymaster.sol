@@ -13,7 +13,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MultiSigners} from "../../lib/MultiSigners.sol";
 
 contract StartaleTokenPaymaster {
-   /**
+    /**
      * @notice Gets the cost in amount of tokens.
      * @param _actualGasCost The gas consumed by the userOperation.
      * @param _postOpGas The gas overhead of transfering the ERC-20 when making the postOp payment.
