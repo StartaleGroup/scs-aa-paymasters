@@ -9,6 +9,18 @@ import { PackedUserOperation } from "account-abstraction/interfaces/PackedUserOp
 import { SimpleAccountFactory, SimpleAccount } from "@account-abstraction/contracts/samples/SimpleAccountFactory.sol";
 import "./CheatCodes.sol";
 
+/// @title Execution
+/// @notice Struct to encapsulate execution data for a transaction
+struct Execution {
+    /// @notice The target address for the transaction
+    address target;
+    /// @notice The value in wei to send with the transaction
+    uint256 value;
+    /// @notice The calldata for the transaction
+    bytes callData;
+}
+
+
 contract TestHelper is CheatCodes {
 
     // -----------------------------------------
@@ -43,13 +55,44 @@ contract TestHelper is CheatCodes {
         /// Initializes the testing environment
         setupPredefinedWallets();
         deployTestContracts();
-        // deploySimpleAccountForPredefinedWallets();
+        deploySimpleAccountForPredefinedWallets();
     }
 
     function createAndFundWallet(string memory name, uint256 amount) internal returns (Vm.Wallet memory) {
         Vm.Wallet memory wallet = newWallet(name);
         vm.deal(wallet.addr, amount);
         return wallet;
+    }
+
+    // -----------------------------------------
+    // Account Deployment Functions
+    // -----------------------------------------
+    /// @notice Deploys an account with a specified wallet, deposit amount, and optional index
+    /// @param wallet The wallet to deploy the account for
+    /// @param deposit The deposit amount
+    /// @param index The salt index for the account
+    /// @return The deployed Simple account
+    function deploySimpleAccount(Vm.Wallet memory wallet, uint256 deposit, uint256 index) internal returns (SimpleAccount) {
+        address payable accountAddress = calculateAccountAddress(wallet.addr, index);
+        bytes memory initCode = buildInitCode(wallet.addr, index);
+
+        PackedUserOperation[] memory userOps = new PackedUserOperation[](1);
+        userOps[0] = buildUserOpWithInitAndCalldata(wallet, initCode, "", index, 0);
+
+        ENTRYPOINT.depositTo{ value: deposit }(address(accountAddress));
+        ENTRYPOINT.handleOps(userOps, payable(wallet.addr));
+        assertTrue(SimpleAccount(accountAddress).owner() == wallet.addr);
+        return SimpleAccount(accountAddress);
+    }
+
+     /// @notice Deploys SimpleAccount accounts for predefined wallets
+    function deploySimpleAccountForPredefinedWallets() internal {
+        BOB_ACCOUNT = deploySimpleAccount(BOB, 100 ether, 0);
+        vm.label(address(BOB_ACCOUNT), "BOB_ACCOUNT");
+        ALICE_ACCOUNT = deploySimpleAccount(ALICE, 100 ether,0);
+        vm.label(address(ALICE_ACCOUNT), "ALICE_ACCOUNT");
+        CHARLIE_ACCOUNT = deploySimpleAccount(CHARLIE, 100 ether, 0);
+        vm.label(address(CHARLIE_ACCOUNT), "CHARLIE_ACCOUNT");
     }
 
     function setupPredefinedWallets() internal {
@@ -67,35 +110,169 @@ contract TestHelper is CheatCodes {
         BUNDLER = createAndFundWallet("BUNDLER", 1000 ether);
         BUNDLER_ADDRESS = payable(BUNDLER.addr);
 
-        FACTORY_OWNER = createAndFundWallet("FACTORY_OWNER", 1000 ether);
+        FACTORY_OWNER = createAndFundWallet("FACTORY_OWNER", 1000 ether); // If needed
     }
 
     function deployTestContracts() internal {
         ENTRYPOINT = new EntryPoint();
         vm.etch(address(0x0000000071727De22E5E9d8BAf0edAc6f37da032), address(ENTRYPOINT).code);
         ENTRYPOINT = IEntryPoint(0x0000000071727De22E5E9d8BAf0edAc6f37da032);
-        // ACCOUNT_IMPLEMENTATION = new Nexus(address(ENTRYPOINT));
-        // FACTORY = new NexusAccountFactory(address(ACCOUNT_IMPLEMENTATION), address(FACTORY_OWNER.addr));
+        // ACCOUNT_IMPLEMENTATION = new SimpleAccount(address(ENTRYPOINT));
+        // Factory deploys it's own implementation
+        FACTORY = new SimpleAccountFactory(ENTRYPOINT); 
     }
 
     // -----------------------------------------
     // Utility Functions
     // -----------------------------------------
 
-    // todo: calculateAccountAddress
+    /// @notice Calculates the address of a new simple account
+    /// @param owner The address of the owner
+    /// @param index Salt index for the account
+    /// @notice we can override this to meet the needs of a different 7579 account
+    function calculateAccountAddress(
+        address owner,
+        uint256 index // salt
+    ) internal virtual view returns(address payable account){
+        return payable(FACTORY.getAddress(owner, index));
+    }
 
-    // todo: buildInitCode
+    /// @notice Prepares the init code for simple account creation
+    /// @param ownerAddress The address of the owner
+    /// @param index Salt index for the account
+    /// @return initCode The prepared init code
+    /// @notice we can override this to meet the needs of a different 7579 account
+    function buildInitCode(address ownerAddress, uint256 index) internal virtual view returns (bytes memory initCode) {
+        // Prepend the factory address to the encoded function call to form the initCode
+        initCode = abi.encodePacked(
+            address(FACTORY),
+            abi.encodeWithSelector(FACTORY.createAccount.selector, ownerAddress, index)
+        );
+    }
 
-    // todo: buildUserOpWithInitAndCalldata
+    /// @notice Builds a user operation struct for account abstraction tests
+    /// @param sender The sender address
+    /// @param nonce The nonce
+    /// @return userOp The built user operation
+    /// @notice we could add means to be able to pass overriden values for gas limits
+    function buildPackedUserOp(address sender, uint256 nonce) internal virtual pure returns (PackedUserOperation memory) {
+        return PackedUserOperation({
+            sender: sender,
+            nonce: nonce,
+            initCode: "",
+            callData: "",
+            accountGasLimits: bytes32(abi.encodePacked(uint128(3e6), uint128(3e6))), // verification and call gas limit
+            preVerificationGas: 3e5, // Adjusted preVerificationGas
+            gasFees: bytes32(abi.encodePacked(uint128(3e6), uint128(3e6))), // maxFeePerGas and maxPriorityFeePerGas
+            paymasterAndData: "",
+            signature: ""
+        });
+    }
 
-    // Todo: buildUserOpWithCalldata
+    /// @notice Prepares a packed user operation with specified parameters (execution for simple account)
+    /// @param signer The wallet to sign the operation
+    /// @param account The Nexus account
+    /// @param executions The executions to include
+    /// @return userOps The prepared packed user operations
+    /// @notice we can make a util to prepare calldata for ERC7579 account
+    function buildPackedUserOperation(
+        Vm.Wallet memory signer,
+        SimpleAccount account,
+        Execution[] memory executions
+    )
+        internal
+        virtual
+        view
+        returns (PackedUserOperation[] memory userOps)
+    {
+        // Initialize the userOps array with one operation
+        userOps = new PackedUserOperation[](1);
 
-    // Todo: buildPackedUserOperation
+        // Build the UserOperation
+        userOps[0] = buildPackedUserOp(address(account), getNonce(address(account), 0));
+
+        uint256 length = executions.length;
+        bytes memory callData;
+
+        if(length == 1) {
+            callData = abi.encodeWithSelector(SimpleAccount.execute.selector, executions[0].target, executions[0].value, executions[0].callData);
+        } else if (length > 1) {
+            address[] memory targets = new address[](length);
+            uint256[] memory values = new uint256[](length);
+            bytes[] memory calldatas = new bytes[](length);
+
+            for (uint256 i = 0; i < length; i++) {
+                targets[i] = executions[i].target;
+                values[i] = executions[i].value;
+                calldatas[i] = executions[i].callData;
+            }
+
+            callData = abi.encodeWithSelector(SimpleAccount.executeBatch.selector, targets, values, calldatas);
+
+        } else {
+            revert("Executions array cannot be empty");
+        }
+
+       userOps[0].callData = callData;
+       // Sign the operation
+       bytes32 userOpHash = ENTRYPOINT.getUserOpHash(userOps[0]);
+       userOps[0].signature = signMessage(signer, userOpHash);
+       return userOps;
+    }
+
+    /// @notice Prepares a user operation with call data for a simple account
+    /// @param wallet The wallet for which the user operation is prepared
+    /// @param callData The call data
+    /// @param index The salt index for the account
+    /// @param nonceKey The nonce key for the account
+    /// @return userOp The prepared user operation
+    function buildUserOpWithCalldata(
+        Vm.Wallet memory wallet,
+        bytes memory callData,
+        uint256 index,
+        uint192 nonceKey
+    )
+        internal
+        virtual
+        view
+        returns (PackedUserOperation memory userOp)
+    {
+        address payable account = calculateAccountAddress(wallet.addr, index);
+        uint256 nonce = getNonce(account, nonceKey);
+        userOp = buildPackedUserOp(account, nonce);
+        userOp.callData = callData;
+        bytes memory signature = signUserOp(wallet, userOp);
+        userOp.signature = signature;
+    }
+
+    /// @notice Prepares a user operation with init code and call data
+    /// @param wallet The wallet for which the user operation is prepared
+    /// @param initCode The init code
+    /// @param callData The call data
+    /// @param index The salt index for the account
+    /// @param nonceKey The nonce key for the account
+    /// @return userOp The prepared user operation
+    function buildUserOpWithInitAndCalldata(
+        Vm.Wallet memory wallet,
+        bytes memory initCode,
+        bytes memory callData,
+        uint256 index,
+        uint192 nonceKey
+    )
+        internal
+        virtual
+        view
+        returns (PackedUserOperation memory userOp)
+    {
+        userOp = buildUserOpWithCalldata(wallet, callData, index, nonceKey);
+        userOp.initCode = initCode;
+        bytes memory signature = signUserOp(wallet, userOp);
+        userOp.signature = signature;
+    }
 
     /// @notice Retrieves the nonce for a given account and validator
     /// @param account The account address
-    function getNonce(address account) internal view returns (uint256 nonce) {
-        uint192 key = makeNonceKey();
+    function getNonce(address account, uint192 key) internal virtual view returns (uint256 nonce) {
         nonce = ENTRYPOINT.getNonce(address(account), key);
     }
 
@@ -131,23 +308,7 @@ contract TestHelper is CheatCodes {
         vm.etch(newAddress, originalAddress.code);
     }
 
-    /// @notice Builds a user operation struct for account abstraction tests
-    /// @param sender The sender address
-    /// @param nonce The nonce
-    /// @return userOp The built user operation
-    function buildPackedUserOp(address sender, uint256 nonce) internal pure returns (PackedUserOperation memory) {
-        return PackedUserOperation({
-            sender: sender,
-            nonce: nonce,
-            initCode: "",
-            callData: "",
-            accountGasLimits: bytes32(abi.encodePacked(uint128(3e6), uint128(3e6))), // verification and call gas limit
-            preVerificationGas: 3e5, // Adjusted preVerificationGas
-            gasFees: bytes32(abi.encodePacked(uint128(3e6), uint128(3e6))), // maxFeePerGas and maxPriorityFeePerGas
-            paymasterAndData: "",
-            signature: ""
-        });
-    }
+
 
     /// @notice Signs a message and packs r, s, v into bytes
     /// @param wallet The wallet to sign the message
@@ -159,7 +320,6 @@ contract TestHelper is CheatCodes {
         signature = abi.encodePacked(r, s, v);
     }
 
-    // Todo: buildPackedUserOperation
 
     /// @dev Returns a random non-zero address.
     /// @notice Returns a random non-zero address

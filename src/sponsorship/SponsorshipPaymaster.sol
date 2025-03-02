@@ -482,6 +482,8 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         if (value > UNACCOUNTED_GAS_LIMIT) {
             revert UnaccountedGasTooHigh();
         }
+        uint256 oldUnaccountedGas = unaccountedGas;
         unaccountedGas = value;
+        emit UnaccountedGasChanged(oldUnaccountedGas, value);
     }
 }
