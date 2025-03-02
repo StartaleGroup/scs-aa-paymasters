@@ -40,7 +40,7 @@ const MOCK_SIG = "0x1234";
 const MOCK_DYNAMIC_ADJUSTMENT = 1100000;
 
 const DUMMY_PAYMASTER_VERIFICATION_GAS_LIMIT = BigInt(251165);
-const DUMMY_PAYMASTER_POST_OP_GAS_LIIMIT = BigInt(46908);
+const DUMMY_PAYMASTER_POST_OP_GAS_LIIMIT = BigInt(100000);
 
 function getPaymasterData(validUntil: number, validAfter: number) {
   const data = {
@@ -181,6 +181,8 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
       }),
     });
 
+    console.log("paymaster address ", paymasterAddress);
+
     // Deposit ETH to Paymaster address in EntryPoint contract
     // @ts-ignore
     await walletClient.sendTransaction({
@@ -191,6 +193,18 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
         abi: entryPointAbi,
         functionName: "depositTo",
         args: [paymasterAddress],
+      }),
+    });
+
+    // Todo: Review below action and type errors.
+    await walletClient.sendTransaction({
+      account: defaultWalletAddress,
+      to: paymasterAddress,
+      value: parseEther("1"),
+      data: encodeFunctionData({
+        abi: sponsorshipPaymasterAbi,
+        functionName: "depositFor",
+        args: [MOCK_FUNDING_ID],
       }),
     });
 
@@ -218,8 +232,8 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
         ],
         [
           paymasterAddress,
-          BigInt(1500),
-          BigInt(1500),
+          BigInt(100000),
+          BigInt(100000),
           MOCK_FUNDING_ID,
           MOCK_VALID_UNTIL,
           MOCK_VALID_AFTER,
@@ -240,8 +254,8 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
       expect(res[1]).to.be.equal(MOCK_VALID_UNTIL);
       expect(res[2]).to.be.equal(MOCK_VALID_AFTER);
       expect(res[3]).to.be.equal(MOCK_DYNAMIC_ADJUSTMENT);
-      expect(res[4]).to.be.equal(BigInt(1500));
-      expect(res[5]).to.be.equal(BigInt(1500));
+      expect(res[4]).to.be.equal(BigInt(100000));
+      expect(res[5]).to.be.equal(BigInt(100000));
       expect(res[6]).to.be.equal(MOCK_SIG);
     });
   });

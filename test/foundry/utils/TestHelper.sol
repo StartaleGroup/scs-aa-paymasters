@@ -19,7 +19,7 @@ contract TestHelper is CheatCodes {
     Vm.Wallet internal ALICE;
     Vm.Wallet internal CHARLIE;
     Vm.Wallet internal BUNDLER;
-    Vm.Wallet internal FACTORY_OWNER;
+    Vm.Wallet internal FACTORY_OWNER; // If Applicable
 
     address internal BOB_ADDRESS;
     address internal ALICE_ADDRESS;
