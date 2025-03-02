@@ -296,6 +296,10 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
             revert PaymasterSignatureLengthInvalid();
         }
 
+        if (unaccountedGas > _userOp.unpackPostOpGasLimit()) {
+            revert PostOpGasLimitTooLow();
+        }
+
         address recoveredSigner = (
             (getHash(_userOp, sponsorAccount, validUntil, validAfter, feeMarkup).toEthSignedMessageHash()).tryRecover(
                 signature
@@ -317,6 +321,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         }
 
         // Calculate the max penalty to ensure the paymaster doesn't underpay
+        // Note: This is just a check to approximate max charge including penalty
         uint256 maxPenalty = (
             (
                 uint128(uint256(_userOp.accountGasLimits))
@@ -336,7 +341,12 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         sponsorBalances[sponsorAccount] -= (effectiveCost + maxPenalty);
         emit UserOperationSponsored(_userOpHash, _userOp.getSender());
 
-        return (abi.encode(sponsorAccount, feeMarkup, effectiveCost), validationData);
+        // Save some state to help calculate the expected penalty during postOp
+        uint256 preOpGasApproximation = _userOp.preVerificationGas + _userOp.unpackVerificationGasLimit()
+            + _userOp.unpackPaymasterVerificationGasLimit();
+        uint256 executionGasLimit = _userOp.unpackCallGasLimit() + _userOp.unpackPostOpGasLimit();
+
+        return (abi.encode(sponsorAccount, feeMarkup, effectiveCost, preOpGasApproximation, executionGasLimit), validationData);
     }
 
     /**
@@ -351,11 +361,25 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         internal
         override
     {
-        (address sponsorAccount, uint32 feeMarkup, uint256 prechargedAmount) =
-            abi.decode(context, (address, uint32, uint256));
+        (address sponsorAccount, uint32 feeMarkup, uint256 prechargedAmount, uint256 preOpGasApproximation, uint256 executionGasLimit) =
+            abi.decode(context, (address, uint32, uint256, uint256, uint256));
+
+        uint256 actualGas = actualGasCost / actualUserOpFeePerGas;
+
+        uint256 executionGasUsed;
+        if (actualGas + unaccountedGas > preOpGasApproximation) {
+            executionGasUsed = actualGas + unaccountedGas - preOpGasApproximation;
+        }
+
+        uint256 expectedPenaltyGas;
+        if (executionGasLimit > executionGasUsed) {
+            expectedPenaltyGas = (executionGasLimit - executionGasUsed) * 10 / 100;
+        }
+        // Review: could emit expected penalty gas    
+
         // Include unaccountedGas since EP doesn't include this in actualGasCost
         // unaccountedGas = postOpGas + EP overhead gas
-        actualGasCost = actualGasCost + (unaccountedGas * actualUserOpFeePerGas);
+        actualGasCost = actualGasCost + ((unaccountedGas + expectedPenaltyGas) * actualUserOpFeePerGas);
 
         uint256 adjustedGasCost = (actualGasCost * feeMarkup) / FEE_MARKUP_DENOMINATOR;
         uint256 premium = adjustedGasCost - actualGasCost;
@@ -372,6 +396,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
             sponsorBalances[sponsorAccount] -= deduction;
         }
 
+        // Note: can emit the mode
         emit GasBalanceDeducted(sponsorAccount, actualGasCost, premium, mode);
     }
 

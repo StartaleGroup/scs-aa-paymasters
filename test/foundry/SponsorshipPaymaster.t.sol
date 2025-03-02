@@ -4,12 +4,12 @@ pragma solidity ^0.8.28;
 import {Test, console} from "forge-std/Test.sol";
 import {EntryPoint} from "@account-abstraction/contracts/core/EntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
-import {SponsorshipPaymaster} from "../src/sponsorship/SponsorshipPaymaster.sol";
+import {SponsorshipPaymaster} from "../../src/sponsorship/SponsorshipPaymaster.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {TestCounter} from "./TestCounter.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {SimpleAccountFactory, SimpleAccount} from "@account-abstraction/contracts/samples/SimpleAccountFactory.sol";
-import {ISponsorshipPaymasterEventsAndErrors} from "../src/interfaces/ISponsorshipPaymasterEventsAndErrors.sol";
+import {ISponsorshipPaymasterEventsAndErrors} from "../../src/interfaces/ISponsorshipPaymasterEventsAndErrors.sol";
 
 contract SponsorshipPaymasterTest is Test {
     SponsorshipPaymaster paymaster;
@@ -242,7 +242,7 @@ contract SponsorshipPaymasterTest is Test {
         PaymasterData memory data = PaymasterData({
             paymasterAddress: address(paymaster),
             preVerificationGas: 100_000,
-            postOpGas: 50_000,
+            postOpGas: 100_000, // must be more than unaccountedGas. unaccountedGas should not be more than postOpGasLimit.
             sponsorAccount: sponsorAccount,
             validUntil: 0, // 0 means no time limit
             validAfter: 0,
