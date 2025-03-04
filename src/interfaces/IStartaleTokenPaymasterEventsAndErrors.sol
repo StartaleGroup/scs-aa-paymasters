@@ -11,7 +11,6 @@ interface IStartaleTokenPaymasterEventsAndErrors {
 
     event TokensWithdrawn(address indexed token, address indexed to, address indexed actor, uint256 amount);
 
-
     // Errors
     /// @notice The paymaster data length is invalid.
     error PaymasterAndDataLengthInvalid();

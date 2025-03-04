@@ -11,6 +11,8 @@ import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MultiSigners} from "../../lib/MultiSigners.sol";
+import {PriceOracleHelper} from "./PriceOracleHelper.sol";
+import {CommonStructs} from "./common/CommonStructs.sol";
 import {IStartaleTokenPaymaster} from "../../interfaces/IStartaleTokenPaymaster.sol";
 import {IStartaleTokenPaymasterEventsAndErrors} from "../../interfaces/IStartaleTokenPaymasterEventsAndErrors.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
@@ -18,7 +20,13 @@ import {IWETH} from "@uniswap/swap-router-contracts/contracts/interfaces/IWETH.s
 // import SwapRoputer
 
 // Maybe add PrinceOracleHelper base
-contract StartaleTokenPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTransient, IStartaleTokenPaymaster {
+contract StartaleTokenPaymaster is
+    BasePaymaster,
+    MultiSigners,
+    PriceOracleHelper,
+    ReentrancyGuardTransient,
+    IStartaleTokenPaymaster
+{
     using UserOperationLib for PackedUserOperation;
     using SignatureCheckerLib for address;
     using ECDSA_solady for bytes32;
@@ -26,7 +34,7 @@ contract StartaleTokenPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardT
     // Denominator to prevent precision errors when applying fee markup
     uint256 private constant FEE_MARKUP_DENOMINATOR = 1e6;
 
-    uint256 private constant MAX_FEE_MARKUP= 2e6;
+    uint256 private constant MAX_FEE_MARKUP = 2e6;
 
     // Limit for unaccounted gas cost
     uint256 private constant UNACCOUNTED_GAS_LIMIT = 150_000;
@@ -60,10 +68,20 @@ contract StartaleTokenPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardT
         uint256 _unaccountedGas,
         address _nativeAssetToUsdOracle, // IOracle
         uint256 _nativeAssetmaxOracleRoundAge,
-        uint256 _nativeAssetDecimals,
+        uint8 _nativeAssetDecimals,
         address[] memory _independentTokens,
-        TokenInfo[] memory _independentTokenConfigs
-    ) BasePaymaster(_owner, IEntryPoint(_entryPoint)) MultiSigners(_signers) {
+        TokenInfo[] memory _independentTokenConfigs // Consists of fee markup and oracle config
+    )
+        BasePaymaster(_owner, IEntryPoint(_entryPoint))
+        MultiSigners(_signers)
+        PriceOracleHelper(
+            _nativeAssetToUsdOracle,
+            _nativeAssetmaxOracleRoundAge,
+            _nativeAssetDecimals,
+            _independentTokens,
+            _independentTokenConfigs
+        )
+    {
         // Todo: Check constructor args
         tokenFeesTreasury = _tokenFeesTreasury;
         unaccountedGas = _unaccountedGas;
@@ -77,7 +95,6 @@ contract StartaleTokenPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardT
         }
     }
 
-
     // Todo: Some other internal methods like
     // _validateIndependentMode
     // _validateExternalMode
@@ -86,7 +103,6 @@ contract StartaleTokenPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardT
     // _createPostOpContext
     // _parsePostOpContext
     // _parseConfig // Based on mode
-
 
     // Todo: Methods to update token oracle config
     // Todo: Methods to add new independent token support. -> oracle config, fee markup config, etc.
@@ -128,7 +144,7 @@ contract StartaleTokenPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardT
         emit EthWithdrawn(recipient, amount);
     }
 
-     /**
+    /**
      * @dev Adds a new signer to the list of authorized signers.
      * @param _signer The address of the signer to add.
      */
@@ -170,9 +186,7 @@ contract StartaleTokenPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardT
     function _postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost, uint256 actualUserOpFeePerGas)
         internal
         override
-    {
-
-    }
+    {}
 
     /**
      * @notice Gets the cost in amount of tokens.
