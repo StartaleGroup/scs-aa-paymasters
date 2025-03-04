@@ -3,8 +3,14 @@ pragma solidity ^0.8.28;
 
 import {IPaymaster} from "@account-abstraction/contracts/interfaces/IPaymaster.sol";
 
-interface ISponsorshipPaymasterEventsAndErrors {
+interface IStartaleTokenPaymasterEventsAndErrors {
     // Events
+    event EthWithdrawn(address indexed recipient, uint256 indexed amount);
+
+    event Received(address indexed sender, uint256 value);
+
+    event TokensWithdrawn(address indexed token, address indexed to, address indexed actor, uint256 amount);
+
 
     // Errors
     /// @notice The paymaster data length is invalid.
@@ -12,4 +18,12 @@ interface ISponsorshipPaymasterEventsAndErrors {
 
     /// @notice The paymaster data mode is invalid. The mode should be 0 or 1.
     error PaymasterModeInvalid();
+
+    error PaymasterSignatureLengthInvalid();
+
+    error UnaccountedGasTooHigh();
+
+    error InvalidWithdrawalAddress();
+
+    error WithdrawalFailed();
 }
