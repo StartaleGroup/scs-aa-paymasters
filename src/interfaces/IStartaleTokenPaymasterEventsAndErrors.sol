@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {IPaymaster} from "@account-abstraction/contracts/interfaces/IPaymaster.sol";
+import {IOracleHelper} from "./IOracleHelper.sol";
 
 interface IStartaleTokenPaymasterEventsAndErrors {
     // Events
@@ -10,6 +11,21 @@ interface IStartaleTokenPaymasterEventsAndErrors {
     event Received(address indexed sender, uint256 value);
 
     event TokensWithdrawn(address indexed token, address indexed to, address indexed actor, uint256 amount);
+
+    event TokenFeeMarkupUpdated(address indexed token, uint48 newFeeMarkup);
+
+    event TokenAdded(
+        address indexed token,
+        uint48 feeMarkup,
+        IOracleHelper.TokenOracleConfig oracleConfig
+    );
+
+    event TokenRemoved(address indexed token);
+
+    event TokenOracleConfigUpdated(
+        address indexed token,
+        IOracleHelper.TokenOracleConfig newConfig
+    );
 
     // Errors
     /// @notice The paymaster data length is invalid.
@@ -25,4 +41,16 @@ interface IStartaleTokenPaymasterEventsAndErrors {
     error InvalidWithdrawalAddress();
 
     error WithdrawalFailed();
+
+    error FeeMarkupTooHigh();
+
+    error UnsupportedToken();
+
+    error ArrayLengthMismatch();
+
+    error InvalidTokenAddress();
+
+    error TokenAlreadySupported();
+
+    error TokenNotSupported();
 }

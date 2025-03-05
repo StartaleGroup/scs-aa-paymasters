@@ -12,14 +12,11 @@ import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/Reentrancy
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MultiSigners} from "../../lib/MultiSigners.sol";
 import {PriceOracleHelper} from "./PriceOracleHelper.sol";
-import {CommonStructs} from "./common/CommonStructs.sol";
 import {IStartaleTokenPaymaster} from "../../interfaces/IStartaleTokenPaymaster.sol";
-import {IStartaleTokenPaymasterEventsAndErrors} from "../../interfaces/IStartaleTokenPaymasterEventsAndErrors.sol";
-import {IOracle} from "../../interfaces/IOracle.sol";
+import {IOracleHelper} from "../../interfaces/IOracleHelper.sol";
 import {IWETH} from "@uniswap/swap-router-contracts/contracts/interfaces/IWETH.sol";
 // import SwapRoputer
 
-// Maybe add PrinceOracleHelper base
 contract StartaleTokenPaymaster is
     BasePaymaster,
     MultiSigners,
@@ -58,7 +55,8 @@ contract StartaleTokenPaymaster is
      */
     // ISwapRouter public swapRouter;
 
-    mapping(address => uint48) public independentTokenFeeMarkup;
+    
+    mapping(address => TokenConfig) private tokenConfigs;
 
     constructor(
         address _owner,
@@ -66,32 +64,34 @@ contract StartaleTokenPaymaster is
         address[] memory _signers,
         address _tokenFeesTreasury,
         uint256 _unaccountedGas,
-        address _nativeAssetToUsdOracle, // IOracle
-        uint256 _nativeAssetmaxOracleRoundAge,
+        address _nativeAssetToUsdOracle,
+        uint48 _nativeAssetmaxOracleRoundAge,
         uint8 _nativeAssetDecimals,
         address[] memory _independentTokens,
-        TokenInfo[] memory _independentTokenConfigs // Consists of fee markup and oracle config
+        uint48[] memory _feeMarkups,
+        IOracleHelper.TokenOracleConfig[] memory _tokenOracleConfigs
     )
         BasePaymaster(_owner, IEntryPoint(_entryPoint))
         MultiSigners(_signers)
         PriceOracleHelper(
             _nativeAssetToUsdOracle,
-            _nativeAssetmaxOracleRoundAge,
-            _nativeAssetDecimals,
+            IOracleHelper.NativeOracleConfig({
+                maxOracleRoundAge: _nativeAssetmaxOracleRoundAge,
+                nativeAssetDecimals: _nativeAssetDecimals
+            }),
             _independentTokens,
-            _independentTokenConfigs
+            _tokenOracleConfigs
         )
     {
-        // Todo: Check constructor args
+        if (_independentTokens.length != _feeMarkups.length || _independentTokens.length != _tokenOracleConfigs.length) {
+            revert ArrayLengthMismatch();
+        }
+
         tokenFeesTreasury = _tokenFeesTreasury;
         unaccountedGas = _unaccountedGas;
 
-        // put these in oracle helper config
-        // _nativeAssetToUsdOracle, _nativeAssetPriceExpiryDuration, _nativeAssetDecimals
-
         for (uint256 i = 0; i < _independentTokens.length; i++) {
-            // Todo: validations
-            independentTokenFeeMarkup[_independentTokens[i]] = _independentTokenConfigs[i].feeMarkup;
+            _addSupportedToken(_independentTokens[i], _feeMarkups[i], _tokenOracleConfigs[i]);
         }
     }
 
@@ -203,5 +203,98 @@ contract StartaleTokenPaymaster is
         uint256 _exchangeRate
     ) public pure returns (uint256) {
         return ((_actualGasCost + (_postOpGas * _actualUserOpFeePerGas)) * _exchangeRate) / 1e18;
+    }
+
+    /**
+     * @dev Adds a new supported token with its configuration
+     * @param token The token address
+     * @param feeMarkup The fee markup for the token
+     * @param oracleConfig The oracle configuration for the token
+     */
+    function addSupportedToken(
+        address token,
+        uint48 feeMarkup,
+        IOracleHelper.TokenOracleConfig calldata oracleConfig
+    ) external onlyOwner {
+        _addSupportedToken(token, feeMarkup, oracleConfig);
+    }
+
+    /**
+     * @dev Internal function to add a supported token
+     */
+    function _addSupportedToken(
+        address token,
+        uint48 feeMarkup,
+        IOracleHelper.TokenOracleConfig memory oracleConfig
+    ) private {
+        if (token == address(0)) revert InvalidTokenAddress();
+        if (feeMarkup > MAX_FEE_MARKUP) revert FeeMarkupTooHigh();
+        if (tokenConfigs[token].isEnabled) revert TokenAlreadySupported();
+
+        tokenConfigs[token] = TokenConfig({
+            feeMarkup: feeMarkup,
+            isEnabled: true
+        });
+
+        _updateTokenOracleConfig(token, oracleConfig);
+        emit TokenAdded(token, feeMarkup, oracleConfig);
+    }
+
+    /**
+     * @dev Removes a supported token
+     * @param token The token address to remove
+     */
+    function removeSupportedToken(address token) external onlyOwner {
+        if (!tokenConfigs[token].isEnabled) revert TokenNotSupported();
+
+        delete tokenConfigs[token];
+        delete tokenOracleConfigurations[token];
+        emit TokenRemoved(token);
+    }
+
+    /**
+     * @dev Updates the oracle configuration for a specific token
+     * @param token The token address
+     * @param newOracleConfig The new oracle configuration
+     */
+    function updateTokenOracleConfig(
+        address token,
+        IOracleHelper.TokenOracleConfig calldata newOracleConfig
+    ) external onlyOwner {
+        if (!tokenConfigs[token].isEnabled) revert TokenNotSupported();
+        
+        _updateTokenOracleConfig(token, newOracleConfig);
+        emit TokenOracleConfigUpdated(token, newOracleConfig);
+    }
+
+    /**
+     * @dev Updates the fee markup for a specific token
+     * @param token The token address to update
+     * @param newFeeMarkup The new fee markup value
+     */
+    function updateTokenFeeMarkup(address token, uint48 newFeeMarkup) external onlyOwner {
+        if (!tokenConfigs[token].isEnabled) revert TokenNotSupported();
+        if (newFeeMarkup > MAX_FEE_MARKUP) revert FeeMarkupTooHigh();
+        
+        tokenConfigs[token].feeMarkup = newFeeMarkup;
+        emit TokenFeeMarkupUpdated(token, newFeeMarkup);
+    }
+
+    /**
+     * @dev Checks if a token is supported and enabled
+     * @param token The token address to check
+     * @return bool True if token is supported and enabled
+     */
+    function isTokenSupported(address token) external view returns (bool) {
+        return tokenConfigs[token].isEnabled;
+    }
+
+    /**
+     * @dev Gets the fee markup for a specific token
+     * @param token The token address
+     * @return uint48 The fee markup value
+     */
+    function getTokenFeeMarkup(address token) external view returns (uint48) {
+        return tokenConfigs[token].feeMarkup;
     }
 }
