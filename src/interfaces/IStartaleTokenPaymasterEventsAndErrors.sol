@@ -14,18 +14,11 @@ interface IStartaleTokenPaymasterEventsAndErrors {
 
     event TokenFeeMarkupUpdated(address indexed token, uint48 newFeeMarkup);
 
-    event TokenAdded(
-        address indexed token,
-        uint48 feeMarkup,
-        IOracleHelper.TokenOracleConfig oracleConfig
-    );
+    event TokenAdded(address indexed token, uint48 feeMarkup, IOracleHelper.TokenOracleConfig oracleConfig);
 
     event TokenRemoved(address indexed token);
 
-    event TokenOracleConfigUpdated(
-        address indexed token,
-        IOracleHelper.TokenOracleConfig newConfig
-    );
+    event TokenOracleConfigUpdated(address indexed token, IOracleHelper.TokenOracleConfig newConfig);
 
     // Errors
     /// @notice The paymaster data length is invalid.

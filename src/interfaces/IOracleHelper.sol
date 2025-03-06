@@ -10,12 +10,12 @@ interface IOracleHelper {
         IOracle tokenOracle;
         // The maximum acceptable age of the price oracle round
         uint48 maxOracleRoundAge;
-        // Review
-        // We could add token oracle decimals here
-
-        // If we add caching logic then cacheTimeToLive goes here.
-        // But cachedPrice will go in different storage.
     }
+    // Review
+    // We could add token oracle decimals here
+
+    // If we add caching logic then cacheTimeToLive goes here.
+    // But cachedPrice will go in different storage.
 
     struct NativeOracleConfig {
         // The maximum acceptable age of the price oracle round (price expiry)
@@ -33,4 +33,4 @@ interface IOracleHelper {
     error ArrayLengthMismatch();
     error InvalidOracleAddress();
     error InvalidMaxOracleRoundAge();
-} 
+}

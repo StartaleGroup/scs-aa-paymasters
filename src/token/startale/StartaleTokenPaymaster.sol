@@ -57,7 +57,7 @@ contract StartaleTokenPaymaster is
      */
     // ISwapRouter public swapRouter;
 
-    /// @notice This is a mapping for independent tokens to their activated state and fee markup. 
+    /// @notice This is a mapping for independent tokens to their activated state and fee markup.
     /// The actual information on token oracle config is stored in the parent contract in a different mapping.
     mapping(address => TokenConfig) private tokenConfigs;
 
@@ -86,7 +86,10 @@ contract StartaleTokenPaymaster is
             _tokenOracleConfigs
         )
     {
-        if (_independentTokens.length != _feeMarkupsForIndependentTokens.length || _independentTokens.length != _tokenOracleConfigs.length) {
+        if (
+            _independentTokens.length != _feeMarkupsForIndependentTokens.length
+                || _independentTokens.length != _tokenOracleConfigs.length
+        ) {
             revert ArrayLengthMismatch();
         }
 
@@ -185,12 +188,11 @@ contract StartaleTokenPaymaster is
             ) * 10 * _userOp.unpackMaxFeePerGas()
         ) / 100;
 
-
         // Save some state to help calculate the expected penalty during postOp
         uint256 preOpGasApproximation = _userOp.preVerificationGas + _userOp.unpackVerificationGasLimit()
             + _userOp.unpackPaymasterVerificationGasLimit();
 
-        uint256 executionGasLimit = _userOp.unpackCallGasLimit() + _userOp.unpackPostOpGasLimit();    
+        uint256 executionGasLimit = _userOp.unpackCallGasLimit() + _userOp.unpackPostOpGasLimit();
 
         if (mode == PaymasterMode.INDEPENDENT) {
             (address tokenAddress) = modeSpecificData.parseIndependentModeSpecificData();
@@ -209,11 +211,10 @@ contract StartaleTokenPaymaster is
             // We would need feeMarkup for this token from storage.
             uint48 feeMarkup = getTokenFeeMarkup(tokenAddress);
 
-
             // Optionally Calculate exchange rate. Only if we are ensuring balance here.
             // Calculate max cost in token terms using above exchange rate.
             // Check if sender has enough balance.
-            // We avoid transferFrom here. So no precharge. 
+            // We avoid transferFrom here. So no precharge.
 
             // prepare appropriate context.
             bytes memory context = abi.encode(
@@ -230,13 +231,20 @@ contract StartaleTokenPaymaster is
 
             return (context, validationData);
         } else if (mode == PaymasterMode.EXTERNAL) {
-            (uint48 validUntil, uint48 validAfter, address tokenAddress, uint256 exchangeRate, uint48 appliedFeeMarkup, bytes calldata signature) = modeSpecificData.parseExternalModeSpecificData();
+            (
+                uint48 validUntil,
+                uint48 validAfter,
+                address tokenAddress,
+                uint256 exchangeRate,
+                uint48 appliedFeeMarkup,
+                bytes calldata signature
+            ) = modeSpecificData.parseExternalModeSpecificData();
 
             // ... _validateExternalMode() -> context, validationData
 
-            // Validate Sig Length 
+            // Validate Sig Length
             if (signature.length != 64 && signature.length != 65) {
-            revert PaymasterSignatureLengthInvalid();
+                revert PaymasterSignatureLengthInvalid();
             }
 
             // Validate supplied markup is not greater than max markup.
@@ -245,9 +253,11 @@ contract StartaleTokenPaymaster is
             }
 
             address recoveredSigner = (
-              (getHashForExternalMode(_userOp, validUntil, validAfter, tokenAddress, exchangeRate, appliedFeeMarkup).toEthSignedMessageHash()).tryRecover(
-                signature
-              )
+                (
+                    getHashForExternalMode(
+                        _userOp, validUntil, validAfter, tokenAddress, exchangeRate, appliedFeeMarkup
+                    ).toEthSignedMessageHash()
+                ).tryRecover(signature)
             );
 
             bool isValidSig = signers[recoveredSigner];
@@ -259,13 +269,12 @@ contract StartaleTokenPaymaster is
                 return ("", validationData);
             }
 
-
             // Calculate max cost in native tokens
             // Calculate max cost in token terms using supplied exchange rate.
             // Check if sender has enough balance.
-            // We avoid transferFrom here. So no precharge. 
+            // We avoid transferFrom here. So no precharge.
 
-            // prepare appropriate context. 
+            // prepare appropriate context.
             bytes memory context = abi.encode(
                 _userOp.sender,
                 tokenAddress,
@@ -289,7 +298,7 @@ contract StartaleTokenPaymaster is
         }
     }
 
-     /**
+    /**
      * @dev Generates a hash of the given UserOperation to be signed by the paymaster.
      * @param userOp The UserOperation structure.
      * @param validUntil The timestamp until which the UserOperation is valid.
@@ -340,7 +349,15 @@ contract StartaleTokenPaymaster is
         override
     {
         // Method to parse context.
-        (address sender, address tokenAddress, uint256 maxPenalty, uint256 preOpGasApproximation, uint256 executionGasLimit, uint256 exchangeRate, uint48 appliedFeeMarkup) = abi.decode(context, (address, address, uint256, uint256, uint256, uint256, uint48));
+        (
+            address sender,
+            address tokenAddress,
+            uint256 maxPenalty,
+            uint256 preOpGasApproximation,
+            uint256 executionGasLimit,
+            uint256 exchangeRate,
+            uint48 appliedFeeMarkup
+        ) = abi.decode(context, (address, address, uint256, uint256, uint256, uint256, uint48));
         uint256 actualGas = actualGasCost / actualUserOpFeePerGas;
 
         // If exchangeRate is 0, it means it was not set in the validatePaymasterUserOp => independent mode
@@ -373,12 +390,11 @@ contract StartaleTokenPaymaster is
         // There is no preCharged amount so we can go ahead and transfer the token now.
         uint256 tokenAmount = (adjustedGasCost * exchangeRate) / 1e18; // 1e18 = 10**_nativeAssetDecimals
 
-
         if (SafeTransferLib.trySafeTransferFrom(tokenAddress, sender, tokenFeesTreasury, tokenAmount)) {
             // emit PaidGasInTokens(sender, tokenAddress, actualGasCost, tokenAmount, appliedFeeMarkup, exchangeRate);
         } else {
             // revert FailedToChargeTokens(sender, tokenAddress, tokenAmount);
-        }     
+        }
     }
 
     /**
@@ -404,30 +420,24 @@ contract StartaleTokenPaymaster is
      * @param feeMarkup The fee markup for the token
      * @param oracleConfig The oracle configuration for the token
      */
-    function addSupportedToken(
-        address token,
-        uint48 feeMarkup,
-        IOracleHelper.TokenOracleConfig calldata oracleConfig
-    ) external onlyOwner {
+    function addSupportedToken(address token, uint48 feeMarkup, IOracleHelper.TokenOracleConfig calldata oracleConfig)
+        external
+        onlyOwner
+    {
         _addSupportedToken(token, feeMarkup, oracleConfig);
     }
 
     /**
      * @dev Internal function to add a supported token
      */
-    function _addSupportedToken(
-        address token,
-        uint48 feeMarkup,
-        IOracleHelper.TokenOracleConfig memory oracleConfig
-    ) private {
+    function _addSupportedToken(address token, uint48 feeMarkup, IOracleHelper.TokenOracleConfig memory oracleConfig)
+        private
+    {
         if (token == address(0)) revert InvalidTokenAddress();
         if (feeMarkup > MAX_FEE_MARKUP) revert FeeMarkupTooHigh();
         if (tokenConfigs[token].isEnabled) revert TokenAlreadySupported();
 
-        tokenConfigs[token] = TokenConfig({
-            feeMarkup: feeMarkup,
-            isEnabled: true
-        });
+        tokenConfigs[token] = TokenConfig({feeMarkup: feeMarkup, isEnabled: true});
 
         _updateTokenOracleConfig(token, oracleConfig);
         emit TokenAdded(token, feeMarkup, oracleConfig);
@@ -450,12 +460,12 @@ contract StartaleTokenPaymaster is
      * @param token The token address
      * @param newOracleConfig The new oracle configuration
      */
-    function updateTokenOracleConfig(
-        address token,
-        IOracleHelper.TokenOracleConfig calldata newOracleConfig
-    ) external onlyOwner {
+    function updateTokenOracleConfig(address token, IOracleHelper.TokenOracleConfig calldata newOracleConfig)
+        external
+        onlyOwner
+    {
         if (!tokenConfigs[token].isEnabled) revert TokenNotSupported(token);
-        
+
         _updateTokenOracleConfig(token, newOracleConfig);
         emit TokenOracleConfigUpdated(token, newOracleConfig);
     }
@@ -470,7 +480,7 @@ contract StartaleTokenPaymaster is
     function updateTokenFeeMarkup(address token, uint48 newFeeMarkup) external onlyOwner {
         if (!tokenConfigs[token].isEnabled) revert TokenNotSupported(token);
         if (newFeeMarkup > MAX_FEE_MARKUP) revert FeeMarkupTooHigh();
-        
+
         tokenConfigs[token].feeMarkup = newFeeMarkup;
         emit TokenFeeMarkupUpdated(token, newFeeMarkup);
     }

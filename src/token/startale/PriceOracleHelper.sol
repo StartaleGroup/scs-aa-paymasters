@@ -19,7 +19,7 @@ abstract contract PriceOracleHelper {
         IOracleHelper.TokenOracleConfig[] memory _tokenOracleConfigs
     ) {
         if (_tokens.length != _tokenOracleConfigs.length) revert IOracleHelper.ArrayLengthMismatch();
-        
+
         nativeAssetToUsdOracle = IOracle(_nativeAssetToUsdOracle);
         nativeOracleConfig = _nativeOracleConfig;
 
@@ -33,10 +33,7 @@ abstract contract PriceOracleHelper {
      * @param token The token address
      * @param newConfig The new oracle configuration
      */
-    function _updateTokenOracleConfig(
-        address token,
-        IOracleHelper.TokenOracleConfig memory newConfig
-    ) internal {
+    function _updateTokenOracleConfig(address token, IOracleHelper.TokenOracleConfig memory newConfig) internal {
         _setTokenOracleConfig(token, newConfig);
         emit IOracleHelper.TokenOracleConfigUpdated(token, newConfig);
     }
@@ -45,14 +42,14 @@ abstract contract PriceOracleHelper {
      * @dev Updates the native token oracle configuration
      * @param newConfig The new oracle configuration
      */
-    function _updateNativeOracleConfig(
-        IOracleHelper.NativeOracleConfig calldata newConfig
-    ) internal {
+    function _updateNativeOracleConfig(IOracleHelper.NativeOracleConfig calldata newConfig) internal {
         nativeOracleConfig = newConfig;
-        emit IOracleHelper.NativeOracleConfigUpdated(IOracleHelper.TokenOracleConfig({
-            tokenOracle: nativeAssetToUsdOracle,
-            maxOracleRoundAge: newConfig.maxOracleRoundAge
-        }));
+        emit IOracleHelper.NativeOracleConfigUpdated(
+            IOracleHelper.TokenOracleConfig({
+                tokenOracle: nativeAssetToUsdOracle,
+                maxOracleRoundAge: newConfig.maxOracleRoundAge
+            })
+        );
     }
 
     /**
@@ -60,13 +57,10 @@ abstract contract PriceOracleHelper {
      * @param token The token address
      * @param config The oracle configuration
      */
-    function _setTokenOracleConfig(
-        address token,
-        IOracleHelper.TokenOracleConfig memory config
-    ) private {
+    function _setTokenOracleConfig(address token, IOracleHelper.TokenOracleConfig memory config) private {
         if (address(config.tokenOracle) == address(0)) revert IOracleHelper.InvalidOracleAddress();
         if (config.maxOracleRoundAge == 0) revert IOracleHelper.InvalidMaxOracleRoundAge();
-        
+
         tokenOracleConfigurations[token] = config;
     }
 
@@ -89,15 +83,17 @@ abstract contract PriceOracleHelper {
         require(answer > 0, "TPM: Chainlink price <= 0");
         require(updatedAt >= block.timestamp - _maxOracleRoundAge, "TPM: Incomplete round");
         require(answeredInRound >= roundId, "TPM: Stale price");
+        // Todo: review checking oracle decimals
         price = uint256(answer);
     }
 
+    /// 1 native token to x number of token in wei.
     function getExchangeRate(address token) public view returns (uint256 exchangeRate) {
         IOracleHelper.TokenOracleConfig memory config = tokenOracleConfigurations[token];
-        if (address(config.tokenOracle)  == address(0)) revert NoOracleConfiguredForToken(token);
+        if (address(config.tokenOracle) == address(0)) revert NoOracleConfiguredForToken(token);
         uint256 tokenPrice = fetchPrice(config.tokenOracle, config.maxOracleRoundAge);
         uint256 nativePrice = fetchPrice(nativeAssetToUsdOracle, nativeOracleConfig.maxOracleRoundAge);
         // Note: We could store token decimals in the tokenOracleConfig, but we don't have a way to set it yet.
-        exchangeRate = (nativePrice * 10**IERC20Metadata(token).decimals()) / tokenPrice;
+        exchangeRate = (nativePrice * 10 ** IERC20Metadata(token).decimals()) / tokenPrice;
     }
 }
