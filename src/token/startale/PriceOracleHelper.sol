@@ -75,4 +75,17 @@ abstract contract PriceOracleHelper {
     function getTokenOracleConfig(address token) external view returns (IOracleHelper.TokenOracleConfig memory) {
         return tokenOracleConfigurations[token];
     }
+
+    /// @notice Fetches the latest price from the given Oracle.
+    /// @dev This function is used to get the latest price from the tokenOracle or nativeOracle.
+    /// @param _oracle The Oracle contract to fetch the price from.
+    /// @param _maxOracleRoundAge The maximum acceptable age of the price oracle round (price expiry).
+    /// @return price The latest price fetched from the Oracle.
+    function fetchPrice(IOracle _oracle, uint48 _maxOracleRoundAge) internal view returns (uint256 price) {
+        (uint80 roundId, int256 answer,, uint256 updatedAt, uint80 answeredInRound) = _oracle.latestRoundData();
+        require(answer > 0, "TPM: Chainlink price <= 0");
+        require(updatedAt >= block.timestamp - _maxOracleRoundAge, "TPM: Incomplete round");
+        require(answeredInRound >= roundId, "TPM: Stale price");
+        price = uint256(answer);
+    }
 }

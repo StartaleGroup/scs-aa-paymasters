@@ -15,6 +15,7 @@ import {PriceOracleHelper} from "./PriceOracleHelper.sol";
 import {IStartaleTokenPaymaster} from "../../interfaces/IStartaleTokenPaymaster.sol";
 import {IOracleHelper} from "../../interfaces/IOracleHelper.sol";
 import {IWETH} from "@uniswap/swap-router-contracts/contracts/interfaces/IWETH.sol";
+import {TokenPaymasterParserLib} from "../../lib/TokenPaymasterParserLib.sol";
 // import SwapRoputer
 
 contract StartaleTokenPaymaster is
@@ -27,6 +28,7 @@ contract StartaleTokenPaymaster is
     using UserOperationLib for PackedUserOperation;
     using SignatureCheckerLib for address;
     using ECDSA_solady for bytes32;
+    using TokenPaymasterParserLib for bytes;
 
     // Denominator to prevent precision errors when applying fee markup
     uint256 private constant FEE_MARKUP_DENOMINATOR = 1e6;
@@ -36,7 +38,7 @@ contract StartaleTokenPaymaster is
     // Limit for unaccounted gas cost
     uint256 private constant UNACCOUNTED_GAS_LIMIT = 150_000;
 
-    // Todo: can do
+    // Review: can do
     // Constants for the paymaster data length in case of different modes.
 
     // fee collector address
@@ -44,7 +46,8 @@ contract StartaleTokenPaymaster is
 
     uint256 public unaccountedGas;
 
-    // Below could be part of swap helper contract
+    // Note: Below could be part of swap helper contract
+
     /**
      * @notice The native token wrapper used by the swap router.
      */
@@ -68,7 +71,7 @@ contract StartaleTokenPaymaster is
         uint48 _nativeAssetmaxOracleRoundAge,
         uint8 _nativeAssetDecimals,
         address[] memory _independentTokens,
-        uint48[] memory _feeMarkups,
+        uint48[] memory _feeMarkupsForIndependentTokens,
         IOracleHelper.TokenOracleConfig[] memory _tokenOracleConfigs
     )
         BasePaymaster(_owner, IEntryPoint(_entryPoint))
@@ -83,7 +86,7 @@ contract StartaleTokenPaymaster is
             _tokenOracleConfigs
         )
     {
-        if (_independentTokens.length != _feeMarkups.length || _independentTokens.length != _tokenOracleConfigs.length) {
+        if (_independentTokens.length != _feeMarkupsForIndependentTokens.length || _independentTokens.length != _tokenOracleConfigs.length) {
             revert ArrayLengthMismatch();
         }
 
@@ -91,22 +94,12 @@ contract StartaleTokenPaymaster is
         unaccountedGas = _unaccountedGas;
 
         for (uint256 i = 0; i < _independentTokens.length; i++) {
-            _addSupportedToken(_independentTokens[i], _feeMarkups[i], _tokenOracleConfigs[i]);
+            _addSupportedToken(_independentTokens[i], _feeMarkupsForIndependentTokens[i], _tokenOracleConfigs[i]);
         }
     }
 
-    // Todo: Some other internal methods like
-    // _validateIndependentMode
-    // _validateExternalMode
-    // _validateSponsoredPostpaidMode
-    // ...
     // _createPostOpContext
     // _parsePostOpContext
-    // _parseConfig // Based on mode
-
-    // Todo: Methods to update token oracle config
-    // Todo: Methods to add new independent token support. -> oracle config, fee markup config, etc.
-    // Todo: Methods to update configuration related to native token oracle
 
     /**
      * @dev Allows the owner to set the extra gas used in post-op calculations.
@@ -172,7 +165,75 @@ contract StartaleTokenPaymaster is
         bytes32 _userOpHash,
         uint256 requiredPreFund
     ) internal override returns (bytes memory, uint256) {
-        return ("", 0);
+        (PaymasterMode mode, bytes calldata modeSpecificData) = _userOp.paymasterAndData.parsePaymasterAndData();
+
+        // Note: This changes as we add more modes.
+        if (uint8(mode) > 2) {
+            revert InvalidPaymasterMode();
+        }
+
+        if (unaccountedGas > _userOp.unpackPostOpGasLimit()) {
+            revert PostOpGasLimitTooLow();
+        }
+
+        // Calculate the max penalty to ensure the paymaster doesn't underpay
+        // Note: This is just a check to approximate max charge including penalty
+        uint256 maxPenalty = (
+            (
+                uint128(uint256(_userOp.accountGasLimits))
+                    + uint128(bytes16(_userOp.paymasterAndData[PAYMASTER_POSTOP_GAS_OFFSET:PAYMASTER_DATA_OFFSET]))
+            ) * 10 * _userOp.unpackMaxFeePerGas()
+        ) / 100;
+
+
+
+        if (mode == PaymasterMode.INDEPENDENT) {
+            (address tokenAddress) = modeSpecificData.parseIndependentModeSpecificData();
+            // Check length it must be 20 bytes.
+
+            // Check if token is supported.
+            if (!isTokenSupported(tokenAddress)) {
+                revert TokenNotSupported(tokenAddress);
+            }
+
+            // ... _validateIndependentMode() -> context, validationData
+
+            // Calculate max cost in native tokens
+            // We would need feeMarkup for this token from storage.
+
+            // Calculate exchange rate.
+
+            // Calculate max cost in token terms using above exchange rate.
+
+            // Check if sender has enough balance.
+
+            // WE avoid transferFrom here. So no precharge. 
+
+            // prepare appropriate context.
+        } else if (mode == PaymasterMode.EXTERNAL) {
+            (uint48 validUntil, uint48 validAfter, address tokenAddress, uint256 exchangeRate, uint32 appliedFeeMarkup, bytes calldata signature) = modeSpecificData.parseExternalModeSpecificData();
+
+            // ... _validateExternalMode() -> context, validationData
+
+            // Validate Sig Length 
+
+            // Validate supplied markup is not greater than max markup.
+
+            // Calculate max cost in native tokens
+            // Calculate max cost in token terms using supplied exchange rate.
+
+            // Check if sender has enough balance.
+
+            // WE avoid transferFrom here. So no precharge. 
+
+            // prepare appropriate context. 
+        } else if (mode == PaymasterMode.SPONSORED_POSTPAID) {
+            (bytes memory signature) = modeSpecificData.parseSponsoredPostpaidModeSpecificData();
+
+            // This mode just goes ahead and pays for the gas.
+            // Signature validation is required here.
+            // No need to send anything in context.
+        }
     }
 
     /**
@@ -186,7 +247,14 @@ contract StartaleTokenPaymaster is
     function _postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost, uint256 actualUserOpFeePerGas)
         internal
         override
-    {}
+    {
+        // Method to parse context.
+        // uint256 actualGas = actualGasCost / actualUserOpFeePerGas;
+
+        // safeTransferFrom
+        // emit appropriate event.
+
+    }
 
     /**
      * @notice Gets the cost in amount of tokens.
@@ -245,7 +313,7 @@ contract StartaleTokenPaymaster is
      * @param token The token address to remove
      */
     function removeSupportedToken(address token) external onlyOwner {
-        if (!tokenConfigs[token].isEnabled) revert TokenNotSupported();
+        if (!tokenConfigs[token].isEnabled) revert TokenNotSupported(token);
 
         delete tokenConfigs[token];
         delete tokenOracleConfigurations[token];
@@ -261,11 +329,13 @@ contract StartaleTokenPaymaster is
         address token,
         IOracleHelper.TokenOracleConfig calldata newOracleConfig
     ) external onlyOwner {
-        if (!tokenConfigs[token].isEnabled) revert TokenNotSupported();
+        if (!tokenConfigs[token].isEnabled) revert TokenNotSupported(token);
         
         _updateTokenOracleConfig(token, newOracleConfig);
         emit TokenOracleConfigUpdated(token, newOracleConfig);
     }
+
+    // Note: Todo: can also add helper to update native oracle config.
 
     /**
      * @dev Updates the fee markup for a specific token
@@ -273,7 +343,7 @@ contract StartaleTokenPaymaster is
      * @param newFeeMarkup The new fee markup value
      */
     function updateTokenFeeMarkup(address token, uint48 newFeeMarkup) external onlyOwner {
-        if (!tokenConfigs[token].isEnabled) revert TokenNotSupported();
+        if (!tokenConfigs[token].isEnabled) revert TokenNotSupported(token);
         if (newFeeMarkup > MAX_FEE_MARKUP) revert FeeMarkupTooHigh();
         
         tokenConfigs[token].feeMarkup = newFeeMarkup;
@@ -285,7 +355,7 @@ contract StartaleTokenPaymaster is
      * @param token The token address to check
      * @return bool True if token is supported and enabled
      */
-    function isTokenSupported(address token) external view returns (bool) {
+    function isTokenSupported(address token) public view returns (bool) {
         return tokenConfigs[token].isEnabled;
     }
 
@@ -294,7 +364,7 @@ contract StartaleTokenPaymaster is
      * @param token The token address
      * @return uint48 The fee markup value
      */
-    function getTokenFeeMarkup(address token) external view returns (uint48) {
+    function getTokenFeeMarkup(address token) public view returns (uint48) {
         return tokenConfigs[token].feeMarkup;
     }
 }

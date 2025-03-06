@@ -19,9 +19,11 @@ interface IStartaleTokenPaymaster is IStartaleTokenPaymasterEventsAndErrors {
         SPONSORED_POSTPAID, // User operation is sponsored by paymaster. Paymaster pays for gas and sponsor pays via a credit card
         EXTERNAL, // Price provided by external service. Authenticated using signature from verifyingSigner/s
         INDEPENDENT // Price queried from oracle. No signature needed from external service.
-            // RESERVED, // maybe
-            // INDEPENDENT_WITH_PERMIT
 
+        // Review
+        // RESERVED, // maybe
+        // INDEPENDENT_WITH_PERMIT
+        // EXTERNAL_WITH_PERMIT ?
     }
 
     // addSigner

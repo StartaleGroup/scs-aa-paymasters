@@ -44,13 +44,15 @@ interface IStartaleTokenPaymasterEventsAndErrors {
 
     error FeeMarkupTooHigh();
 
-    error UnsupportedToken();
-
     error ArrayLengthMismatch();
 
     error InvalidTokenAddress();
 
     error TokenAlreadySupported();
 
-    error TokenNotSupported();
+    error TokenNotSupported(address token);
+
+    error InvalidPaymasterMode();
+
+    error PostOpGasLimitTooLow();
 }
