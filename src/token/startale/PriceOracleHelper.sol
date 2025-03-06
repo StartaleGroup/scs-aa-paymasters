@@ -3,8 +3,11 @@ pragma solidity ^0.8.28;
 
 import {IOracle} from "../../interfaces/IOracle.sol";
 import {IOracleHelper} from "../../interfaces/IOracleHelper.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 abstract contract PriceOracleHelper {
+    error NoOracleConfiguredForToken(address token);
+
     IOracle public nativeAssetToUsdOracle; // ETH -> USD price oracle
     IOracleHelper.NativeOracleConfig public nativeOracleConfig;
     mapping(address => IOracleHelper.TokenOracleConfig) public tokenOracleConfigurations;
@@ -87,5 +90,14 @@ abstract contract PriceOracleHelper {
         require(updatedAt >= block.timestamp - _maxOracleRoundAge, "TPM: Incomplete round");
         require(answeredInRound >= roundId, "TPM: Stale price");
         price = uint256(answer);
+    }
+
+    function getExchangeRate(address token) public view returns (uint256 exchangeRate) {
+        IOracleHelper.TokenOracleConfig memory config = tokenOracleConfigurations[token];
+        if (address(config.tokenOracle)  == address(0)) revert NoOracleConfiguredForToken(token);
+        uint256 tokenPrice = fetchPrice(config.tokenOracle, config.maxOracleRoundAge);
+        uint256 nativePrice = fetchPrice(nativeAssetToUsdOracle, nativeOracleConfig.maxOracleRoundAge);
+        // Note: We could store token decimals in the tokenOracleConfig, but we don't have a way to set it yet.
+        exchangeRate = (nativePrice * 10**IERC20Metadata(token).decimals()) / tokenPrice;
     }
 }

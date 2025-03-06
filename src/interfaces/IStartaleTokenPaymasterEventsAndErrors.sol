@@ -55,4 +55,6 @@ interface IStartaleTokenPaymasterEventsAndErrors {
     error InvalidPaymasterMode();
 
     error PostOpGasLimitTooLow();
+
+    error InvalidIndependentModeSpecificData();
 }

@@ -39,7 +39,7 @@ library TokenPaymasterParserLib {
             uint48 validAfter,
             address tokenAddress,
             uint256 exchangeRate, 
-            uint32 appliedFeeMarkup,
+            uint48 appliedFeeMarkup,
             bytes calldata signature
         )
     {
@@ -47,8 +47,8 @@ library TokenPaymasterParserLib {
         validAfter = uint48(bytes6(modeSpecificData[6:12]));
         tokenAddress = address(bytes20(modeSpecificData[12:32]));
         exchangeRate = uint256(bytes32(modeSpecificData[32:64]));
-        appliedFeeMarkup = uint32(bytes4(modeSpecificData[64:68]));
-        signature = modeSpecificData[68:];
+        appliedFeeMarkup = uint48(bytes6(modeSpecificData[64:70]));
+        signature = modeSpecificData[70:];
     }
 
     function parseSponsoredPostpaidModeSpecificData(

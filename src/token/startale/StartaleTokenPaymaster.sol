@@ -16,7 +16,7 @@ import {IStartaleTokenPaymaster} from "../../interfaces/IStartaleTokenPaymaster.
 import {IOracleHelper} from "../../interfaces/IOracleHelper.sol";
 import {IWETH} from "@uniswap/swap-router-contracts/contracts/interfaces/IWETH.sol";
 import {TokenPaymasterParserLib} from "../../lib/TokenPaymasterParserLib.sol";
-// import SwapRoputer
+// Review: Import SwapRoputer
 
 contract StartaleTokenPaymaster is
     BasePaymaster,
@@ -47,7 +47,6 @@ contract StartaleTokenPaymaster is
     uint256 public unaccountedGas;
 
     // Note: Below could be part of swap helper contract
-
     /**
      * @notice The native token wrapper used by the swap router.
      */
@@ -58,7 +57,8 @@ contract StartaleTokenPaymaster is
      */
     // ISwapRouter public swapRouter;
 
-    
+    /// @notice This is a mapping for independent tokens to their activated state and fee markup. 
+    /// The actual information on token oracle config is stored in the parent contract in a different mapping.
     mapping(address => TokenConfig) private tokenConfigs;
 
     constructor(
@@ -186,10 +186,18 @@ contract StartaleTokenPaymaster is
         ) / 100;
 
 
+        // Save some state to help calculate the expected penalty during postOp
+        uint256 preOpGasApproximation = _userOp.preVerificationGas + _userOp.unpackVerificationGasLimit()
+            + _userOp.unpackPaymasterVerificationGasLimit();
+
+        uint256 executionGasLimit = _userOp.unpackCallGasLimit() + _userOp.unpackPostOpGasLimit();    
 
         if (mode == PaymasterMode.INDEPENDENT) {
             (address tokenAddress) = modeSpecificData.parseIndependentModeSpecificData();
             // Check length it must be 20 bytes.
+            if (modeSpecificData.length != 20) {
+                revert InvalidIndependentModeSpecificData();
+            }
 
             // Check if token is supported.
             if (!isTokenSupported(tokenAddress)) {
@@ -198,62 +206,179 @@ contract StartaleTokenPaymaster is
 
             // ... _validateIndependentMode() -> context, validationData
 
-            // Calculate max cost in native tokens
             // We would need feeMarkup for this token from storage.
+            uint48 feeMarkup = getTokenFeeMarkup(tokenAddress);
 
-            // Calculate exchange rate.
 
+            // Optionally Calculate exchange rate. Only if we are ensuring balance here.
             // Calculate max cost in token terms using above exchange rate.
-
             // Check if sender has enough balance.
-
-            // WE avoid transferFrom here. So no precharge. 
+            // We avoid transferFrom here. So no precharge. 
 
             // prepare appropriate context.
+            bytes memory context = abi.encode(
+                _userOp.sender,
+                tokenAddress,
+                maxPenalty, // may not need to pass.
+                preOpGasApproximation,
+                executionGasLimit,
+                uint256(0), // exchangeRate. non-zero in case we solely rely on postOp to call oracle
+                feeMarkup
+            );
+
+            uint256 validationData = _packValidationData(false, 0, 0);
+
+            return (context, validationData);
         } else if (mode == PaymasterMode.EXTERNAL) {
-            (uint48 validUntil, uint48 validAfter, address tokenAddress, uint256 exchangeRate, uint32 appliedFeeMarkup, bytes calldata signature) = modeSpecificData.parseExternalModeSpecificData();
+            (uint48 validUntil, uint48 validAfter, address tokenAddress, uint256 exchangeRate, uint48 appliedFeeMarkup, bytes calldata signature) = modeSpecificData.parseExternalModeSpecificData();
 
             // ... _validateExternalMode() -> context, validationData
 
             // Validate Sig Length 
+            if (signature.length != 64 && signature.length != 65) {
+            revert PaymasterSignatureLengthInvalid();
+            }
 
             // Validate supplied markup is not greater than max markup.
+            if (appliedFeeMarkup > MAX_FEE_MARKUP) {
+                revert FeeMarkupTooHigh();
+            }
+
+            address recoveredSigner = (
+              (getHashForExternalMode(_userOp, validUntil, validAfter, tokenAddress, exchangeRate, appliedFeeMarkup).toEthSignedMessageHash()).tryRecover(
+                signature
+              )
+            );
+
+            bool isValidSig = signers[recoveredSigner];
+
+            uint256 validationData = _packValidationData(!isValidSig, validUntil, validAfter);
+
+            // Do not revert if signature is invalid, just return validationData
+            if (!isValidSig) {
+                return ("", validationData);
+            }
+
 
             // Calculate max cost in native tokens
             // Calculate max cost in token terms using supplied exchange rate.
-
             // Check if sender has enough balance.
-
-            // WE avoid transferFrom here. So no precharge. 
+            // We avoid transferFrom here. So no precharge. 
 
             // prepare appropriate context. 
+            bytes memory context = abi.encode(
+                _userOp.sender,
+                tokenAddress,
+                maxPenalty,
+                preOpGasApproximation,
+                executionGasLimit,
+                exchangeRate,
+                appliedFeeMarkup
+            );
+
+            return (context, validationData);
         } else if (mode == PaymasterMode.SPONSORED_POSTPAID) {
             (bytes memory signature) = modeSpecificData.parseSponsoredPostpaidModeSpecificData();
 
             // This mode just goes ahead and pays for the gas.
             // Signature validation is required here.
             // No need to send anything in context.
+
+            // for now let's just return empty context and validationData
+            return ("", 0);
         }
+    }
+
+     /**
+     * @dev Generates a hash of the given UserOperation to be signed by the paymaster.
+     * @param userOp The UserOperation structure.
+     * @param validUntil The timestamp until which the UserOperation is valid.
+     * @param validAfter The timestamp after which the UserOperation is valid.
+     * @param tokenAddress The address of the token to be used for the UserOperation.
+     * @param exchangeRate The exchange rate of the token.
+     * @param appliedFeeMarkup The fee markup for the UserOperation.
+     * @return The hashed UserOperation data.
+     */
+    function getHashForExternalMode(
+        PackedUserOperation calldata userOp,
+        uint48 validUntil,
+        uint48 validAfter,
+        address tokenAddress,
+        uint256 exchangeRate,
+        uint48 appliedFeeMarkup
+    ) public view returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                userOp.getSender(),
+                userOp.nonce,
+                keccak256(userOp.initCode),
+                keccak256(userOp.callData),
+                userOp.accountGasLimits,
+                uint256(bytes32(userOp.paymasterAndData[PAYMASTER_VALIDATION_GAS_OFFSET:PAYMASTER_DATA_OFFSET])),
+                userOp.preVerificationGas,
+                userOp.gasFees,
+                block.chainid,
+                address(this),
+                validUntil,
+                validAfter,
+                tokenAddress,
+                exchangeRate,
+                appliedFeeMarkup
+            )
+        );
     }
 
     /**
      * @dev Handles the post-operation logic after transaction execution.
      * @notice Adjusts gas costs, refunds excess gas, and ensures sufficient paymaster balance.
-     * @param mode The PostOpMode (OpSucceeded, OpReverted, or PostOpReverted).
      * @param context Encoded context passed from `_validatePaymasterUserOp`.
      * @param actualGasCost The actual gas cost incurred.
      * @param actualUserOpFeePerGas The effective gas price used for calculation.
      */
-    function _postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost, uint256 actualUserOpFeePerGas)
+    function _postOp(PostOpMode, bytes calldata context, uint256 actualGasCost, uint256 actualUserOpFeePerGas)
         internal
         override
     {
         // Method to parse context.
-        // uint256 actualGas = actualGasCost / actualUserOpFeePerGas;
+        (address sender, address tokenAddress, uint256 maxPenalty, uint256 preOpGasApproximation, uint256 executionGasLimit, uint256 exchangeRate, uint48 appliedFeeMarkup) = abi.decode(context, (address, address, uint256, uint256, uint256, uint256, uint48));
+        uint256 actualGas = actualGasCost / actualUserOpFeePerGas;
 
-        // safeTransferFrom
-        // emit appropriate event.
+        // If exchangeRate is 0, it means it was not set in the validatePaymasterUserOp => independent mode
+        // So we need to get the price of the token from the oracle now
+        if (exchangeRate == 0) {
+            exchangeRate = getExchangeRate(tokenAddress);
+            // if exchangeRate is still 0, it means the token is not supported or something went wrong.
+            if (exchangeRate == 0) {
+                // Review error name.
+                revert TokenNotSupported(tokenAddress);
+            }
+        }
 
+        uint256 executionGasUsed;
+        if (actualGas + unaccountedGas > preOpGasApproximation) {
+            executionGasUsed = actualGas + unaccountedGas - preOpGasApproximation;
+        }
+
+        uint256 expectedPenaltyGas;
+        if (executionGasLimit > executionGasUsed) {
+            expectedPenaltyGas = (executionGasLimit - executionGasUsed) * 10 / 100;
+        }
+
+        // Include unaccountedGas since EP doesn't include this in actualGasCost
+        // unaccountedGas = postOpGas + EP overhead gas
+        actualGasCost = actualGasCost + ((unaccountedGas + expectedPenaltyGas) * actualUserOpFeePerGas);
+
+        uint256 adjustedGasCost = (actualGasCost * appliedFeeMarkup) / FEE_MARKUP_DENOMINATOR;
+
+        // There is no preCharged amount so we can go ahead and transfer the token now.
+        uint256 tokenAmount = (adjustedGasCost * exchangeRate) / 1e18; // 1e18 = 10**_nativeAssetDecimals
+
+
+        if (SafeTransferLib.trySafeTransferFrom(tokenAddress, sender, tokenFeesTreasury, tokenAmount)) {
+            // emit PaidGasInTokens(sender, tokenAddress, actualGasCost, tokenAmount, appliedFeeMarkup, exchangeRate);
+        } else {
+            // revert FailedToChargeTokens(sender, tokenAddress, tokenAmount);
+        }     
     }
 
     /**
