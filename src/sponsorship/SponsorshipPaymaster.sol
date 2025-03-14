@@ -347,7 +347,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         uint256 executionGasLimit = _userOp.unpackCallGasLimit() + _userOp.unpackPostOpGasLimit();
 
         return (
-            abi.encode(sponsorAccount, feeMarkup, effectiveCost, preOpGasApproximation, executionGasLimit),
+            abi.encode(sponsorAccount, feeMarkup, effectiveCost + maxPenalty, preOpGasApproximation, executionGasLimit),
             validationData
         );
     }

@@ -6,6 +6,8 @@ import {ISponsorshipPaymaster} from "../../../../src/interfaces/ISponsorshipPaym
 import {SponsorshipPaymaster} from "../../../../src/sponsorship/SponsorshipPaymaster.sol";
 import {ISponsorshipPaymasterEventsAndErrors} from "../../../../src/interfaces/ISponsorshipPaymasterEventsAndErrors.sol";
 import "@account-abstraction/contracts/interfaces/IStakeManager.sol";
+import { MultiSigners} from "../../../../src/sponsorship/MultiSigners.sol";
+import {TestCounter} from "../../TestCounter.sol";
 
 contract TestSponsorshipPaymaster is TestBase {
     SponsorshipPaymaster public sponsorshipPaymaster;
@@ -44,12 +46,60 @@ contract TestSponsorshipPaymaster is TestBase {
         assertEq(testArtifact.unaccountedGas(), 50e3);
     }
 
+
+    function test_RevertIf_DeployWithSignerSetToZero() external {
+        address[] memory signers = new address[](2);
+        signers[0] = PAYMASTER_SIGNER_A.addr;
+        signers[1] = address(0);
+        vm.expectRevert(abi.encodeWithSelector(MultiSigners.SignerAddressCannotBeZero.selector));
+        new SponsorshipPaymaster(
+            PAYMASTER_OWNER.addr, address(ENTRYPOINT), signers, PAYMASTER_FEE_COLLECTOR.addr, 1e15, 3600, 50e3
+        );
+    }
+
+
+    function test_RevertIf_DeployWithSignerAsContract() external {
+        address[] memory signers = new address[](2);
+        signers[0] = PAYMASTER_SIGNER_A.addr;
+        signers[1] = address(new TestCounter());
+        vm.expectRevert(abi.encodeWithSelector(MultiSigners.SignerAddressCannotBeContract.selector));
+        new SponsorshipPaymaster(
+            PAYMASTER_OWNER.addr, address(ENTRYPOINT), signers, PAYMASTER_FEE_COLLECTOR.addr, 1e15, 3600, 50e3
+        );
+    }
+
+    function test_RevertIf_DeployWithFeeCollectorSetToZero() external {
+        address[] memory signers = new address[](2);
+        signers[0] = PAYMASTER_SIGNER_A.addr;
+        signers[1] = PAYMASTER_SIGNER_B.addr;
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.FeeCollectorCanNotBeZero.selector));
+        new SponsorshipPaymaster(
+            PAYMASTER_OWNER.addr, address(ENTRYPOINT), signers, address(0), 1e15, 3600, 50e3
+        );
+    }
+
+    function test_RevertIf_DeployWithFeeCollectorAsContract() external {
+        TestCounter testCounter = new TestCounter();
+        address[] memory signers = new address[](2);
+        signers[0] = PAYMASTER_SIGNER_A.addr;
+        signers[1] = PAYMASTER_SIGNER_B.addr;
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.FeeCollectorCanNotBeContract.selector));
+        new SponsorshipPaymaster(
+            PAYMASTER_OWNER.addr, address(ENTRYPOINT), signers, address(testCounter), 1e15, 3600, 50e3
+        );
+    }
+
+    function test_RevertIf_DeployWithUnaccountedGasCostTooHigh() external {
+        address[] memory signers = new address[](2);
+        signers[0] = PAYMASTER_SIGNER_A.addr;
+        signers[1] = PAYMASTER_SIGNER_B.addr;
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.UnaccountedGasTooHigh.selector));
+        new SponsorshipPaymaster(
+            PAYMASTER_OWNER.addr, address(ENTRYPOINT), signers, PAYMASTER_FEE_COLLECTOR.addr, 1e15, 3600, 200e3
+        );
+    }
+
     // TODO
-    // test_RevertIf_DeployWithSignerSetToZero
-    // test_RevertIf_DeployWithSignerAsContract
-    // test_RevertIf_DeployWithFeeCollectorSetToZero
-    // test_RevertIf_DeployWithFeeCollectorAsContract
-    // test_RevertIf_DeployWithUnaccountedGasCostTooHigh
     // test_CheckInitialPaymasterState
     // test_OwnershipTransfer
     // test_RevertIf_OwnershipTransferToZeroAddress
@@ -74,6 +124,17 @@ contract TestSponsorshipPaymaster is TestBase {
     // test_submitWithdrawalRequest_Happy_Scenario
     // test_executeWithdrawalRequest_Withdraws_WhateverIsLeft
     // test_depositFor_RevertsIf_DepositIsLessThanMinDeposit
+    // test_ValidatePaymasterAndPostOpWithPriceMarkup
+    // test_ValidatePaymasterAndPostOpWithPriceMarkup_NonEmptyCalldata
+    // test_RevertIf_ValidatePaymasterUserOpWithIncorrectSignatureLength
+    // test_RevertIf_ValidatePaymasterUserOpWithInvalidPriceMarkUp
+    // test_RevertIf_ValidatePaymasterUserOpWithInsufficientDeposit
+    // test_Receive
+    // test_WithdrawEth
+    // test_RevertIf_WithdrawEthExceedsBalance
+    // test_WithdrawErc20
+    // test_RevertIf_WithdrawErc20ToZeroAddress
+    // test_ParsePaymasterAndData
 
     function test_SetUnaccountedGas() external prankModifier(PAYMASTER_OWNER.addr) {
         uint256 initialUnaccountedGas = sponsorshipPaymaster.unaccountedGas();
@@ -133,17 +194,4 @@ contract TestSponsorshipPaymaster is TestBase {
         // Calculate and assert price markups and gas payments
         // calculateAndAssertAdjustments(...
     }
-
-    // Todo:
-    // test_ValidatePaymasterAndPostOpWithPriceMarkup
-    // test_ValidatePaymasterAndPostOpWithPriceMarkup_NonEmptyCalldata
-    // test_RevertIf_ValidatePaymasterUserOpWithIncorrectSignatureLength
-    // test_RevertIf_ValidatePaymasterUserOpWithInvalidPriceMarkUp
-    // test_RevertIf_ValidatePaymasterUserOpWithInsufficientDeposit
-    // test_Receive
-    // test_WithdrawEth
-    // test_RevertIf_WithdrawEthExceedsBalance
-    // test_WithdrawErc20
-    // test_RevertIf_WithdrawErc20ToZeroAddress
-    // test_ParsePaymasterAndData
 }
