@@ -77,6 +77,11 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         unaccountedGas = _unaccountedGas;
     }
 
+    receive() external payable {
+        // do nothing
+        // unnecessary to emit emit that consume gas
+    }
+
     function _checkConstructorArgs(address _feeCollectorArg, uint256 _unaccountedGasArg) internal view {
         // Checks for constructor arguments
         // Ensure feeCollector is not zero address

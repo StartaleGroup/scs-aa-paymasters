@@ -274,8 +274,28 @@ contract TestSponsorshipPaymaster is TestBase {
     // test_RevertIf_ValidatePaymasterUserOpWithInvalidPriceMarkUp
     // test_RevertIf_ValidatePaymasterUserOpWithInsufficientDeposit
 
-    // test_Receive
-    // test_WithdrawEth
+    function test_Receive() external prankModifier(ALICE_ADDRESS) {
+        uint256 initialPaymasterBalance = address(sponsorshipPaymaster).balance;
+        uint256 sendAmount = 10 ether;
+
+        (bool success,) = address(sponsorshipPaymaster).call{ value: sendAmount }("");
+
+        assert(success);
+        uint256 resultingPaymasterBalance = address(sponsorshipPaymaster).balance;
+        assertEq(resultingPaymasterBalance, initialPaymasterBalance + sendAmount);
+    }
+
+    function test_WithdrawEth() external prankModifier(PAYMASTER_OWNER.addr) {
+        uint256 initialAliceBalance = ALICE_ADDRESS.balance;
+        uint256 ethAmount = 10 ether;
+        vm.deal(address(sponsorshipPaymaster), ethAmount);
+
+        sponsorshipPaymaster.withdrawEth(payable(ALICE_ADDRESS), ethAmount);
+        vm.stopPrank();
+
+        assertEq(ALICE_ADDRESS.balance, initialAliceBalance + ethAmount);
+        assertEq(address(sponsorshipPaymaster).balance, 0 ether);
+    }
 
     // test_RevertIf_WithdrawEthExceedsBalance
     // test_WithdrawErc20
