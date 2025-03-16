@@ -19,6 +19,7 @@ interface ISponsorshipPaymasterEventsAndErrors {
     error FeeCollectorCanNotBeZero();
     error FeeCollectorCanNotBeContract();
     error PostOpGasLimitTooLow();
+    error InvalidDepositAddress();
 
     event UserOperationSponsored(bytes32 indexed userOpHash, address indexed user);
     event DepositAdded(address indexed user, uint256 amount);

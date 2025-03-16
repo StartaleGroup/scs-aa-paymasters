@@ -18,9 +18,9 @@ import {IPaymaster} from "account-abstraction/interfaces/IPaymaster.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {SponsorshipPaymaster} from "../../src/sponsorship/SponsorshipPaymaster.sol";
-
+import {BaseEventsAndErrors} from "./BaseEventsAndErrors.sol";
 // Notice: We can add a base contract for required events and errors for the paymasters
-abstract contract TestBase is CheatCodes, TestHelper {
+abstract contract TestBase is CheatCodes, TestHelper, BaseEventsAndErrors {
     using UserOperationLib for PackedUserOperation;
 
     address constant ENTRYPOINT_ADDRESS = address(0x0000000071727De22E5E9d8BAf0edAc6f37da032);

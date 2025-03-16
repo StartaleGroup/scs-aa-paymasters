@@ -98,6 +98,8 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
      * @notice Requires first-time deposit to be greater than `minDeposit`.
      */
     function depositFor(address _sponsorAccount) external payable nonReentrant {
+        // check zero address for deposit
+        if (_sponsorAccount == address(0)) revert InvalidDepositAddress();
         // cache msg.value in a variable. https://www.evm.codes/ is a good resource for gas costs
         uint256 depositAmount = msg.value;
 
@@ -182,7 +184,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
      * @param newFeeCollector The new fee collector address.
      */
     function setFeeCollector(address newFeeCollector) external payable onlyOwner {
-        require(newFeeCollector != address(0), "Invalid feeCollector address");
+        if (newFeeCollector == address(0)) revert FeeCollectorCanNotBeZero();
         address oldFeeCollector = feeCollector;
         feeCollector = newFeeCollector;
         emit FeeCollectorChanged(oldFeeCollector, newFeeCollector);

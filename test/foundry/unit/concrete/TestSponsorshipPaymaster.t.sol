@@ -99,22 +99,169 @@ contract TestSponsorshipPaymaster is TestBase {
         );
     }
 
-    // TODO
-    // test_CheckInitialPaymasterState
-    // test_OwnershipTransfer
-    // test_RevertIf_OwnershipTransferToZeroAddress
-    // test_RevertIf_OwnershipTransferTwoStep
-    // test_RevertIf_UnauthorizedOwnershipTransfer
-    // test_AddVerifyingSigner
-    // test_RemoveVerifyingSigner
-    // test_RevertIf_AddVerifyingSignerToZeroAddress
-    // test_SetFeeCollector
-    // test_RevertIf_SetFeeCollectorToZeroAddress
-    // test_RevertIf_UnauthorizedSetFeeCollector
-    // test_RevertIf_SetUnaccountedGasToHigh
-    // test_RevertIf_DepositForZeroAddress
-    // test_RevertIf_DepositForZeroValue
-    // test_RevertIf_DepositCalled
+    function test_CheckInitialPaymasterState() external view {
+        assertEq(sponsorshipPaymaster.owner(), PAYMASTER_OWNER.addr);
+        assertEq(address(sponsorshipPaymaster.entryPoint()), address(ENTRYPOINT));
+        assertEq(sponsorshipPaymaster.isSigner(PAYMASTER_SIGNER_A.addr), true);
+        assertEq(sponsorshipPaymaster.isSigner(PAYMASTER_SIGNER_B.addr), true);
+        assertEq(sponsorshipPaymaster.feeCollector(), PAYMASTER_FEE_COLLECTOR.addr);
+        assertEq(sponsorshipPaymaster.unaccountedGas(), UNACCOUNTED_GAS);
+    }
+
+    function test_OwnershipTransfer() external prankModifier(PAYMASTER_OWNER.addr) {
+        vm.expectEmit(true, true, false, true, address(sponsorshipPaymaster));
+        emit OwnershipTransferred(PAYMASTER_OWNER.addr, BOB_ADDRESS);
+        sponsorshipPaymaster.transferOwnership(BOB_ADDRESS);
+        assertEq(sponsorshipPaymaster.owner(), BOB_ADDRESS);
+    }
+
+    function test_RevertIf_OwnershipTransferToZeroAddress() external prankModifier(PAYMASTER_OWNER.addr) {
+        vm.expectRevert(abi.encodeWithSelector(NewOwnerIsZeroAddress.selector));
+        sponsorshipPaymaster.transferOwnership(address(0));
+    }
+
+    function test_Success_TwoStepOwnershipTransfer() external {
+        assertEq(sponsorshipPaymaster.owner(), PAYMASTER_OWNER.addr);
+        // BOB will request ownership transfer
+        vm.startPrank(BOB_ADDRESS);
+        vm.expectEmit(true, true, false, true, address(sponsorshipPaymaster));
+        emit OwnershipHandoverRequested(BOB_ADDRESS);
+        sponsorshipPaymaster.requestOwnershipHandover();
+        vm.stopPrank();
+
+        // Paymaster owner will accept the ownership transfer
+        vm.startPrank(PAYMASTER_OWNER.addr);
+        // Owner can also cancel it. but if passed with pendingOwner address within 48 hours it will be performed.
+        vm.expectEmit(true, true, false, true, address(sponsorshipPaymaster));
+        emit OwnershipTransferred(PAYMASTER_OWNER.addr, BOB_ADDRESS);
+        sponsorshipPaymaster.completeOwnershipHandover(BOB_ADDRESS);
+        vm.stopPrank();
+
+        assertEq(sponsorshipPaymaster.owner(), BOB_ADDRESS);
+    }
+
+    function test_Failure_TwoStepOwnershipTransferWithdrawn() external {
+        assertEq(sponsorshipPaymaster.owner(), PAYMASTER_OWNER.addr);
+        // BOB will request ownership transfer
+        vm.startPrank(BOB_ADDRESS);
+        vm.expectEmit(true, true, false, true, address(sponsorshipPaymaster));
+        emit OwnershipHandoverRequested(BOB_ADDRESS);
+        sponsorshipPaymaster.requestOwnershipHandover();
+
+        // BOB decides to cancel the ownership transfer
+        sponsorshipPaymaster.cancelOwnershipHandover();
+        vm.stopPrank();
+        
+        // Now if owner tries to complete it doesn't work
+        vm.startPrank(PAYMASTER_OWNER.addr);
+        vm.expectRevert(abi.encodeWithSelector(NoHandoverRequest.selector));
+        sponsorshipPaymaster.completeOwnershipHandover(BOB_ADDRESS);
+        vm.stopPrank();
+
+        assertEq(sponsorshipPaymaster.owner(), PAYMASTER_OWNER.addr);
+    }
+
+    function test_Failure_TwoStepOwnershipTransferExpired() external {
+        assertEq(sponsorshipPaymaster.owner(), PAYMASTER_OWNER.addr);
+        // BOB will request ownership transfer
+        vm.startPrank(BOB_ADDRESS);
+        vm.expectEmit(true, true, false, true, address(sponsorshipPaymaster));
+        emit OwnershipHandoverRequested(BOB_ADDRESS);
+        sponsorshipPaymaster.requestOwnershipHandover();
+        vm.stopPrank();
+
+        // More than 48 hours passed
+        vm.warp(block.timestamp + 49 hours);
+        
+        // Now if owner tries to complete it doesn't work
+        vm.startPrank(PAYMASTER_OWNER.addr);
+        // Reverts now
+        vm.expectRevert(abi.encodeWithSelector(NoHandoverRequest.selector));
+        sponsorshipPaymaster.completeOwnershipHandover(BOB_ADDRESS);
+        vm.stopPrank();
+
+        // Stil owner is the same
+        assertEq(sponsorshipPaymaster.owner(), PAYMASTER_OWNER.addr);
+    }
+
+    function test_RevertIf_UnauthorizedOwnershipTransfer() external {
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector));
+        sponsorshipPaymaster.transferOwnership(BOB_ADDRESS);
+    }
+
+
+    function test_AddVerifyingSigner() external prankModifier(PAYMASTER_OWNER.addr) {
+        assertEq(sponsorshipPaymaster.isSigner(PAYMASTER_SIGNER_A.addr), true);
+        assertEq(sponsorshipPaymaster.isSigner(PAYMASTER_SIGNER_B.addr), true);
+        address newSigner = address(0x123);
+        assertEq(sponsorshipPaymaster.isSigner(newSigner), false);
+        vm.expectEmit(true, true, false, true, address(sponsorshipPaymaster));
+        emit MultiSigners.SignerAdded(newSigner);
+        sponsorshipPaymaster.addSigner(newSigner);
+        assertEq(sponsorshipPaymaster.isSigner(newSigner), true);
+    }
+
+    function test_RemoveVerifyingSigner() external prankModifier(PAYMASTER_OWNER.addr) {
+        assertEq(sponsorshipPaymaster.isSigner(PAYMASTER_SIGNER_A.addr), true);
+        assertEq(sponsorshipPaymaster.isSigner(PAYMASTER_SIGNER_B.addr), true);
+        vm.expectEmit(true, true, false, true, address(sponsorshipPaymaster));
+        emit MultiSigners.SignerRemoved(PAYMASTER_SIGNER_B.addr);
+        sponsorshipPaymaster.removeSigner(PAYMASTER_SIGNER_B.addr);
+        assertEq(sponsorshipPaymaster.isSigner(PAYMASTER_SIGNER_B.addr), false);
+    }
+
+
+    function test_RevertIf_AddVerifyingSignerToZeroAddress() external prankModifier(PAYMASTER_OWNER.addr) {
+        assertEq(sponsorshipPaymaster.isSigner(PAYMASTER_SIGNER_A.addr), true);
+        assertEq(sponsorshipPaymaster.isSigner(PAYMASTER_SIGNER_B.addr), true);
+        vm.expectRevert(abi.encodeWithSelector(MultiSigners.SignerAddressCannotBeZero.selector));
+        sponsorshipPaymaster.addSigner(address(0));
+    }
+
+    function test_SetFeeCollector() external prankModifier(PAYMASTER_OWNER.addr) {
+        address newFeeCollector = address(0x456);
+        vm.expectEmit(true, true, false, true, address(sponsorshipPaymaster));
+        emit ISponsorshipPaymasterEventsAndErrors.FeeCollectorChanged(PAYMASTER_FEE_COLLECTOR.addr, newFeeCollector);
+        sponsorshipPaymaster.setFeeCollector(newFeeCollector);
+        // Assert that the new fee collector is set.
+        assertEq(sponsorshipPaymaster.feeCollector(), newFeeCollector);
+    }
+
+    function test_RevertIf_SetFeeCollectorToZeroAddress() external prankModifier(PAYMASTER_OWNER.addr) {
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.FeeCollectorCanNotBeZero.selector));
+        sponsorshipPaymaster.setFeeCollector(address(0));
+    }
+
+    function test_RevertIf_UnauthorizedSetFeeCollector() external {
+        vm.startPrank(address(0x789)); // Impersonate an unauthorized address.
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector));
+        sponsorshipPaymaster.setFeeCollector(address(0x456));
+        vm.stopPrank();
+    }
+
+    function test_RevertIf_SetUnaccountedGasToHigh() external prankModifier(PAYMASTER_OWNER.addr) {
+        uint256 highGasLimit = 100_000_000; // Assuming this is higher than the maximum allowed.
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.UnaccountedGasTooHigh.selector));
+        sponsorshipPaymaster.setUnaccountedGas(highGasLimit);
+    }
+
+    function test_RevertIf_DepositForZeroAddress() external {
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.InvalidDepositAddress.selector));
+        sponsorshipPaymaster.depositFor{value: 1 ether}(address(0));
+    }
+
+    function test_RevertIf_DepositForZeroValue() external {
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.LowDeposit.selector, 0, MIN_DEPOSIT));
+        sponsorshipPaymaster.depositFor{value: 0}(address(0x123));
+    }
+
+    function test_RevertIf_DepositCalled() external {
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.UseDepositForInstead.selector));
+        sponsorshipPaymaster.deposit();
+    }
+
+    
+
     // test_RevertIf_TriesWithdrawToWithoutRequest
     // test_submitWithdrawalRequest_Fails_with_ZeroAmount
     // test_submitWithdrawalRequest_Fails_with_ZeroAddress
@@ -124,13 +271,16 @@ contract TestSponsorshipPaymaster is TestBase {
     // test_submitWithdrawalRequest_Happy_Scenario
     // test_executeWithdrawalRequest_Withdraws_WhateverIsLeft
     // test_depositFor_RevertsIf_DepositIsLessThanMinDeposit
+
     // test_ValidatePaymasterAndPostOpWithPriceMarkup
     // test_ValidatePaymasterAndPostOpWithPriceMarkup_NonEmptyCalldata
     // test_RevertIf_ValidatePaymasterUserOpWithIncorrectSignatureLength
     // test_RevertIf_ValidatePaymasterUserOpWithInvalidPriceMarkUp
     // test_RevertIf_ValidatePaymasterUserOpWithInsufficientDeposit
+
     // test_Receive
     // test_WithdrawEth
+
     // test_RevertIf_WithdrawEthExceedsBalance
     // test_WithdrawErc20
     // test_RevertIf_WithdrawErc20ToZeroAddress
