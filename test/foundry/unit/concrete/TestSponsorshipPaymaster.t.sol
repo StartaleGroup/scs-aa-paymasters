@@ -276,20 +276,33 @@ contract TestSponsorshipPaymaster is TestBase {
 
     function test_submitWithdrawalRequest_Fails_If_not_enough_balance() external prankModifier(SPONSOR_ACCOUNT.addr) {
         uint256 depositAmount = 1 ether;
-        sponsorshipPaymaster.depositFor{ value: depositAmount }(SPONSOR_ACCOUNT.addr);
-        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.InsufficientFunds.selector, SPONSOR_ACCOUNT.addr, sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr), depositAmount + 1));
+        sponsorshipPaymaster.depositFor{value: depositAmount}(SPONSOR_ACCOUNT.addr);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISponsorshipPaymasterEventsAndErrors.InsufficientFunds.selector,
+                SPONSOR_ACCOUNT.addr,
+                sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr),
+                depositAmount + 1
+            )
+        );
         sponsorshipPaymaster.requestWithdrawal(BOB_ADDRESS, depositAmount + 1);
     }
 
-    function test_executeWithdrawalRequest_Fails_with_NoRequestSubmitted() external prankModifier(SPONSOR_ACCOUNT.addr) {
-        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.NoWithdrawalRequestSubmitted.selector, SPONSOR_ACCOUNT.addr));
+    function test_executeWithdrawalRequest_Fails_with_NoRequestSubmitted()
+        external
+        prankModifier(SPONSOR_ACCOUNT.addr)
+    {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISponsorshipPaymasterEventsAndErrors.NoWithdrawalRequestSubmitted.selector, SPONSOR_ACCOUNT.addr
+            )
+        );
         sponsorshipPaymaster.executeWithdrawal(SPONSOR_ACCOUNT.addr);
     }
 
-
     function test_submitWithdrawalRequest_Happy_Scenario() external prankModifier(SPONSOR_ACCOUNT.addr) {
         uint256 depositAmount = 1 ether;
-        sponsorshipPaymaster.depositFor{ value: depositAmount }(SPONSOR_ACCOUNT.addr);
+        sponsorshipPaymaster.depositFor{value: depositAmount}(SPONSOR_ACCOUNT.addr);
         sponsorshipPaymaster.requestWithdrawal(BOB_ADDRESS, depositAmount);
         vm.warp(block.timestamp + WITHDRAWAL_DELAY + 1);
         uint256 dappPaymasterBalanceBefore = sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr);
@@ -300,19 +313,24 @@ contract TestSponsorshipPaymaster is TestBase {
         assertEq(dappPaymasterBalanceAfter, dappPaymasterBalanceBefore - depositAmount);
         assertEq(bobBalanceAfter, bobBalanceBefore + depositAmount);
         // can not withdraw again
-        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.NoWithdrawalRequestSubmitted.selector, SPONSOR_ACCOUNT.addr));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISponsorshipPaymasterEventsAndErrors.NoWithdrawalRequestSubmitted.selector, SPONSOR_ACCOUNT.addr
+            )
+        );
         sponsorshipPaymaster.executeWithdrawal(SPONSOR_ACCOUNT.addr);
     }
 
     // try to use balance while request is cleared
     function test_executeWithdrawalRequest_Withdraws_WhateverIsLeft() external prankModifier(SPONSOR_ACCOUNT.addr) {
         uint256 depositAmount = 1 ether;
-        sponsorshipPaymaster.depositFor{ value: depositAmount }(SPONSOR_ACCOUNT.addr);
+        sponsorshipPaymaster.depositFor{value: depositAmount}(SPONSOR_ACCOUNT.addr);
         sponsorshipPaymaster.requestWithdrawal(BOB_ADDRESS, depositAmount);
 
         //use balance of the paymaster
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
-        (PackedUserOperation memory userOp,) = createUserOpWithSponsorshipPaymaster(ALICE, sponsorshipPaymaster, 1e6, 55_000);
+        (PackedUserOperation memory userOp,) =
+            createUserOpWithSponsorshipPaymaster(ALICE, sponsorshipPaymaster, 1e6, 55_000);
         ops[0] = userOp;
         startPrank(BUNDLER.addr);
         ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
