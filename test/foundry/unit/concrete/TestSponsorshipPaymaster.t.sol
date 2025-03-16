@@ -8,6 +8,7 @@ import {ISponsorshipPaymasterEventsAndErrors} from "../../../../src/interfaces/I
 import "@account-abstraction/contracts/interfaces/IStakeManager.sol";
 import {MultiSigners} from "../../../../src/sponsorship/MultiSigners.sol";
 import {TestCounter} from "../../TestCounter.sol";
+import {MockToken} from "../../mock/MockToken.sol";
 
 contract TestSponsorshipPaymaster is TestBase {
     SponsorshipPaymaster public sponsorshipPaymaster;
@@ -258,16 +259,78 @@ contract TestSponsorshipPaymaster is TestBase {
         sponsorshipPaymaster.deposit();
     }
 
-    // test_RevertIf_TriesWithdrawToWithoutRequest
-    // test_submitWithdrawalRequest_Fails_with_ZeroAmount
-    // test_submitWithdrawalRequest_Fails_with_ZeroAddress
-    // test_submitWithdrawalRequest_Fails_If_not_enough_balance
-    // test_executeWithdrawalRequest_Fails_with_NoRequestSubmitted
-    // test_cancelWithdrawalRequest_Success
-    // test_submitWithdrawalRequest_Happy_Scenario
-    // test_executeWithdrawalRequest_Withdraws_WhateverIsLeft
-    // test_depositFor_RevertsIf_DepositIsLessThanMinDeposit
+    function test_RevertIf_TriesWithdrawToWithoutRequest() external prankModifier(SPONSOR_ACCOUNT.addr) {
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.SubmitRequestInstead.selector));
+        sponsorshipPaymaster.withdrawTo(payable(BOB_ADDRESS), 1 ether);
+    }
 
+    function test_submitWithdrawalRequest_Fails_with_ZeroAmount() external prankModifier(SPONSOR_ACCOUNT.addr) {
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.CanNotWithdrawZeroAmount.selector));
+        sponsorshipPaymaster.requestWithdrawal(BOB_ADDRESS, 0 ether);
+    }
+
+    function test_submitWithdrawalRequest_Fails_with_ZeroAddress() external prankModifier(SPONSOR_ACCOUNT.addr) {
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.InvalidWithdrawalAddress.selector));
+        sponsorshipPaymaster.requestWithdrawal(address(0), 1 ether);
+    }
+
+    function test_submitWithdrawalRequest_Fails_If_not_enough_balance() external prankModifier(SPONSOR_ACCOUNT.addr) {
+        uint256 depositAmount = 1 ether;
+        sponsorshipPaymaster.depositFor{ value: depositAmount }(SPONSOR_ACCOUNT.addr);
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.InsufficientFunds.selector, SPONSOR_ACCOUNT.addr, sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr), depositAmount + 1));
+        sponsorshipPaymaster.requestWithdrawal(BOB_ADDRESS, depositAmount + 1);
+    }
+
+    function test_executeWithdrawalRequest_Fails_with_NoRequestSubmitted() external prankModifier(SPONSOR_ACCOUNT.addr) {
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.NoWithdrawalRequestSubmitted.selector, SPONSOR_ACCOUNT.addr));
+        sponsorshipPaymaster.executeWithdrawal(SPONSOR_ACCOUNT.addr);
+    }
+
+
+    function test_submitWithdrawalRequest_Happy_Scenario() external prankModifier(SPONSOR_ACCOUNT.addr) {
+        uint256 depositAmount = 1 ether;
+        sponsorshipPaymaster.depositFor{ value: depositAmount }(SPONSOR_ACCOUNT.addr);
+        sponsorshipPaymaster.requestWithdrawal(BOB_ADDRESS, depositAmount);
+        vm.warp(block.timestamp + WITHDRAWAL_DELAY + 1);
+        uint256 dappPaymasterBalanceBefore = sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr);
+        uint256 bobBalanceBefore = BOB_ADDRESS.balance;
+        sponsorshipPaymaster.executeWithdrawal(SPONSOR_ACCOUNT.addr);
+        uint256 dappPaymasterBalanceAfter = sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr);
+        uint256 bobBalanceAfter = BOB_ADDRESS.balance;
+        assertEq(dappPaymasterBalanceAfter, dappPaymasterBalanceBefore - depositAmount);
+        assertEq(bobBalanceAfter, bobBalanceBefore + depositAmount);
+        // can not withdraw again
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.NoWithdrawalRequestSubmitted.selector, SPONSOR_ACCOUNT.addr));
+        sponsorshipPaymaster.executeWithdrawal(SPONSOR_ACCOUNT.addr);
+    }
+
+    // try to use balance while request is cleared
+    function test_executeWithdrawalRequest_Withdraws_WhateverIsLeft() external prankModifier(SPONSOR_ACCOUNT.addr) {
+        uint256 depositAmount = 1 ether;
+        sponsorshipPaymaster.depositFor{ value: depositAmount }(SPONSOR_ACCOUNT.addr);
+        sponsorshipPaymaster.requestWithdrawal(BOB_ADDRESS, depositAmount);
+
+        //use balance of the paymaster
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+        (PackedUserOperation memory userOp,) = createUserOpWithSponsorshipPaymaster(ALICE, sponsorshipPaymaster, 1e6, 55_000);
+        ops[0] = userOp;
+        startPrank(BUNDLER.addr);
+        ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
+        stopPrank();
+
+        uint256 dappPaymasterBalanceAfter = sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr);
+        assertLt(dappPaymasterBalanceAfter, depositAmount);
+        uint256 bobBalanceBeforeWithdrawal = BOB_ADDRESS.balance;
+
+        vm.warp(block.timestamp + WITHDRAWAL_DELAY + 1);
+        sponsorshipPaymaster.executeWithdrawal(SPONSOR_ACCOUNT.addr);
+        uint256 bobBalanceAfterWithdrawal = BOB_ADDRESS.balance;
+        assertEq(bobBalanceAfterWithdrawal, bobBalanceBeforeWithdrawal + dappPaymasterBalanceAfter);
+        assertEq(sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr), 0 ether);
+    }
+
+    // todo
+    // test_depositFor_RevertsIf_DepositIsLessThanMinDeposit
     // test_ValidatePaymasterAndPostOpWithPriceMarkup
     // test_ValidatePaymasterAndPostOpWithPriceMarkup_NonEmptyCalldata
     // test_RevertIf_ValidatePaymasterUserOpWithIncorrectSignatureLength
@@ -278,7 +341,7 @@ contract TestSponsorshipPaymaster is TestBase {
         uint256 initialPaymasterBalance = address(sponsorshipPaymaster).balance;
         uint256 sendAmount = 10 ether;
 
-        (bool success,) = address(sponsorshipPaymaster).call{ value: sendAmount }("");
+        (bool success,) = address(sponsorshipPaymaster).call{value: sendAmount}("");
 
         assert(success);
         uint256 resultingPaymasterBalance = address(sponsorshipPaymaster).balance;
@@ -297,10 +360,75 @@ contract TestSponsorshipPaymaster is TestBase {
         assertEq(address(sponsorshipPaymaster).balance, 0 ether);
     }
 
-    // test_RevertIf_WithdrawEthExceedsBalance
-    // test_WithdrawErc20
-    // test_RevertIf_WithdrawErc20ToZeroAddress
-    // test_ParsePaymasterAndData
+    function test_RevertIf_WithdrawEthExceedsBalance() external prankModifier(PAYMASTER_OWNER.addr) {
+        uint256 ethAmount = 10 ether;
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.WithdrawalFailed.selector));
+        sponsorshipPaymaster.withdrawEth(payable(ALICE_ADDRESS), ethAmount);
+    }
+
+    function test_WithdrawErc20() external prankModifier(PAYMASTER_OWNER.addr) {
+        MockToken token = new MockToken("Token", "TKN");
+        uint256 mintAmount = 10 * (10 ** token.decimals());
+        token.mint(address(sponsorshipPaymaster), mintAmount);
+
+        assertEq(token.balanceOf(address(sponsorshipPaymaster)), mintAmount);
+        assertEq(token.balanceOf(ALICE_ADDRESS), 0);
+
+        vm.expectEmit(true, true, true, true, address(sponsorshipPaymaster));
+        emit ISponsorshipPaymasterEventsAndErrors.TokensWithdrawn(
+            address(token), ALICE_ADDRESS, PAYMASTER_OWNER.addr, mintAmount
+        );
+        sponsorshipPaymaster.withdrawERC20(token, ALICE_ADDRESS, mintAmount);
+
+        assertEq(token.balanceOf(address(sponsorshipPaymaster)), 0);
+        assertEq(token.balanceOf(ALICE_ADDRESS), mintAmount);
+    }
+
+    function test_RevertIf_WithdrawErc20ToZeroAddress() external prankModifier(PAYMASTER_OWNER.addr) {
+        MockToken token = new MockToken("Token", "TKN");
+        uint256 mintAmount = 10 * (10 ** token.decimals());
+        token.mint(address(sponsorshipPaymaster), mintAmount);
+
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.InvalidWithdrawalAddress.selector));
+        sponsorshipPaymaster.withdrawERC20(token, address(0), mintAmount);
+    }
+
+    function test_ParsePaymasterAndData() external view {
+        PackedUserOperation memory userOp = buildUserOpWithCalldata(ALICE, "", 0, 0);
+
+        uint32 priceMarkup = 1e6;
+
+        SponsorshipPaymasterData memory pmData = SponsorshipPaymasterData({
+            validationGasLimit: 100_000,
+            postOpGasLimit: uint128(55_000),
+            sponsorAccount: SPONSOR_ACCOUNT.addr,
+            validUntil: uint48(block.timestamp + 1 days),
+            validAfter: uint48(block.timestamp),
+            feeMarkup: priceMarkup
+        });
+
+        (userOp.paymasterAndData,) =
+            generateAndSignSponsorshipPaymasterData(userOp, PAYMASTER_SIGNER_A, sponsorshipPaymaster, pmData);
+        userOp.signature = signUserOp(ALICE, userOp);
+
+        (
+            address parsedSponsorAccount,
+            uint48 parsedValidUntil,
+            uint48 parsedValidAfter,
+            uint32 parsedFeeMarkup,
+            uint128 parsedPaymasterValidationGasLimit,
+            uint128 parsedPaymasterPostOpGasLimit,
+            bytes memory parsedSignature
+        ) = sponsorshipPaymaster.parsePaymasterAndData(userOp.paymasterAndData);
+
+        assertEq(SPONSOR_ACCOUNT.addr, parsedSponsorAccount);
+        assertEq(pmData.validUntil, parsedValidUntil);
+        assertEq(pmData.validAfter, parsedValidAfter);
+        assertEq(pmData.feeMarkup, parsedFeeMarkup);
+        assertEq(pmData.validationGasLimit, parsedPaymasterValidationGasLimit);
+        assertEq(pmData.postOpGasLimit, parsedPaymasterPostOpGasLimit);
+        assertEq(parsedSignature.length, userOp.signature.length);
+    }
 
     function test_SetUnaccountedGas() external prankModifier(PAYMASTER_OWNER.addr) {
         uint256 initialUnaccountedGas = sponsorshipPaymaster.unaccountedGas();
