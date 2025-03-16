@@ -6,7 +6,7 @@ import {ISponsorshipPaymaster} from "../../../../src/interfaces/ISponsorshipPaym
 import {SponsorshipPaymaster} from "../../../../src/sponsorship/SponsorshipPaymaster.sol";
 import {ISponsorshipPaymasterEventsAndErrors} from "../../../../src/interfaces/ISponsorshipPaymasterEventsAndErrors.sol";
 import "@account-abstraction/contracts/interfaces/IStakeManager.sol";
-import { MultiSigners} from "../../../../src/sponsorship/MultiSigners.sol";
+import {MultiSigners} from "../../../../src/sponsorship/MultiSigners.sol";
 import {TestCounter} from "../../TestCounter.sol";
 
 contract TestSponsorshipPaymaster is TestBase {
@@ -46,7 +46,6 @@ contract TestSponsorshipPaymaster is TestBase {
         assertEq(testArtifact.unaccountedGas(), 50e3);
     }
 
-
     function test_RevertIf_DeployWithSignerSetToZero() external {
         address[] memory signers = new address[](2);
         signers[0] = PAYMASTER_SIGNER_A.addr;
@@ -56,7 +55,6 @@ contract TestSponsorshipPaymaster is TestBase {
             PAYMASTER_OWNER.addr, address(ENTRYPOINT), signers, PAYMASTER_FEE_COLLECTOR.addr, 1e15, 3600, 50e3
         );
     }
-
 
     function test_RevertIf_DeployWithSignerAsContract() external {
         address[] memory signers = new address[](2);
@@ -73,9 +71,7 @@ contract TestSponsorshipPaymaster is TestBase {
         signers[0] = PAYMASTER_SIGNER_A.addr;
         signers[1] = PAYMASTER_SIGNER_B.addr;
         vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.FeeCollectorCanNotBeZero.selector));
-        new SponsorshipPaymaster(
-            PAYMASTER_OWNER.addr, address(ENTRYPOINT), signers, address(0), 1e15, 3600, 50e3
-        );
+        new SponsorshipPaymaster(PAYMASTER_OWNER.addr, address(ENTRYPOINT), signers, address(0), 1e15, 3600, 50e3);
     }
 
     function test_RevertIf_DeployWithFeeCollectorAsContract() external {
@@ -83,7 +79,9 @@ contract TestSponsorshipPaymaster is TestBase {
         address[] memory signers = new address[](2);
         signers[0] = PAYMASTER_SIGNER_A.addr;
         signers[1] = PAYMASTER_SIGNER_B.addr;
-        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.FeeCollectorCanNotBeContract.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.FeeCollectorCanNotBeContract.selector)
+        );
         new SponsorshipPaymaster(
             PAYMASTER_OWNER.addr, address(ENTRYPOINT), signers, address(testCounter), 1e15, 3600, 50e3
         );
@@ -151,7 +149,7 @@ contract TestSponsorshipPaymaster is TestBase {
         // BOB decides to cancel the ownership transfer
         sponsorshipPaymaster.cancelOwnershipHandover();
         vm.stopPrank();
-        
+
         // Now if owner tries to complete it doesn't work
         vm.startPrank(PAYMASTER_OWNER.addr);
         vm.expectRevert(abi.encodeWithSelector(NoHandoverRequest.selector));
@@ -172,7 +170,7 @@ contract TestSponsorshipPaymaster is TestBase {
 
         // More than 48 hours passed
         vm.warp(block.timestamp + 49 hours);
-        
+
         // Now if owner tries to complete it doesn't work
         vm.startPrank(PAYMASTER_OWNER.addr);
         // Reverts now
@@ -188,7 +186,6 @@ contract TestSponsorshipPaymaster is TestBase {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector));
         sponsorshipPaymaster.transferOwnership(BOB_ADDRESS);
     }
-
 
     function test_AddVerifyingSigner() external prankModifier(PAYMASTER_OWNER.addr) {
         assertEq(sponsorshipPaymaster.isSigner(PAYMASTER_SIGNER_A.addr), true);
@@ -209,7 +206,6 @@ contract TestSponsorshipPaymaster is TestBase {
         sponsorshipPaymaster.removeSigner(PAYMASTER_SIGNER_B.addr);
         assertEq(sponsorshipPaymaster.isSigner(PAYMASTER_SIGNER_B.addr), false);
     }
-
 
     function test_RevertIf_AddVerifyingSignerToZeroAddress() external prankModifier(PAYMASTER_OWNER.addr) {
         assertEq(sponsorshipPaymaster.isSigner(PAYMASTER_SIGNER_A.addr), true);
@@ -251,7 +247,9 @@ contract TestSponsorshipPaymaster is TestBase {
     }
 
     function test_RevertIf_DepositForZeroValue() external {
-        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.LowDeposit.selector, 0, MIN_DEPOSIT));
+        vm.expectRevert(
+            abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.LowDeposit.selector, 0, MIN_DEPOSIT)
+        );
         sponsorshipPaymaster.depositFor{value: 0}(address(0x123));
     }
 
@@ -259,8 +257,6 @@ contract TestSponsorshipPaymaster is TestBase {
         vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.UseDepositForInstead.selector));
         sponsorshipPaymaster.deposit();
     }
-
-    
 
     // test_RevertIf_TriesWithdrawToWithoutRequest
     // test_submitWithdrawalRequest_Fails_with_ZeroAmount
