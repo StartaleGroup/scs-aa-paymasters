@@ -91,6 +91,6 @@ src/sponsorship/SponsorshipPaymaster.sol:SponsorshipPaymaster --watch
 
 | Network        | Address                                                                                                                                                                                                                                                      |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Soneium Minato | `0xb28E459aB4a61e78b27768A37C92d902CA89F181` (salt:`0x90d8084deab30c2a37c45e8d47f49f2f7965183cb6990a98943ef94940681de3`, constructor owner: `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, constructor signers `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, FEE_COLLECTOR `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, MIN_DEPOSIT `1000000000000000`WITHDRAWAL_DELAY `60`, UNACCOUNTED_GAS `50000`) |
+| Soneium Minato | `0xcE3428634685df52CBc99146593aaB26580D5D10` (salt:`0x90d8084deab30c2a37c45e8d47f49f2f7965183cb6990a98943ef94940681de3`, constructor owner: `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, constructor signers `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, FEE_COLLECTOR `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, MIN_DEPOSIT `1000000000000000`WITHDRAWAL_DELAY `60`, UNACCOUNTED_GAS `11000`) |
 
 
