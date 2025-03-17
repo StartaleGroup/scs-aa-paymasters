@@ -253,18 +253,14 @@ abstract contract TestBase is CheatCodes, TestHelper, BaseEventsAndErrors {
     }
 
     // Todo: calculateAndAssertAdjustments
-    
+
     function getPriceMarkups(
         SponsorshipPaymaster paymaster,
         uint256 initialSponsorAccountPaymasterBalance,
         uint256 initialFeeCollectorBalance,
         uint32 priceMarkup,
         uint256 maxPenalty
-    )
-        internal
-        view
-        returns (uint256 expectedPriceMarkup, uint256 actualPriceMarkup)
-    {
+    ) internal view returns (uint256 expectedPriceMarkup, uint256 actualPriceMarkup) {
         uint256 resultingSponsorAccountPaymasterBalance = paymaster.getBalance(SPONSOR_ACCOUNT.addr);
         uint256 resultingFeeCollectorPaymasterBalance = paymaster.getBalance(PAYMASTER_FEE_COLLECTOR.addr);
 

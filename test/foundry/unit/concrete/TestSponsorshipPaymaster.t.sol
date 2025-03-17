@@ -592,8 +592,10 @@ contract TestSponsorshipPaymaster is TestBase {
 
         // calculateAndAssertAdjustments(...
         uint256 totalGasFeePaid = BUNDLER.addr.balance - initialBundlerBalance;
-        uint256 gasPaidBySponsor = initialSponsorAccountPaymasterBalance - sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr);
-        uint256 premiumEarnedByFeeCollector = sponsorshipPaymaster.getBalance(PAYMASTER_FEE_COLLECTOR.addr) - initialFeeCollectorBalance; // actualMarkup
+        uint256 gasPaidBySponsor =
+            initialSponsorAccountPaymasterBalance - sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr);
+        uint256 premiumEarnedByFeeCollector =
+            sponsorshipPaymaster.getBalance(PAYMASTER_FEE_COLLECTOR.addr) - initialFeeCollectorBalance; // actualMarkup
         // must be zero here as we didn't charge any markup
         assertEq(premiumEarnedByFeeCollector, 0);
 
@@ -603,7 +605,7 @@ contract TestSponsorshipPaymaster is TestBase {
         // Calculate and assert price markups and gas payments
 
         // Gas paid by dapp is higher than paymaster
-         assertGt(gasPaidBySponsor, totalGasFeePaid);
+        assertGt(gasPaidBySponsor, totalGasFeePaid);
 
         // Ensure that max 2% difference between total gas paid + the adjustment premium and gas paid by dapp (from
         // paymaster)
@@ -648,8 +650,10 @@ contract TestSponsorshipPaymaster is TestBase {
 
         // calculateAndAssertAdjustments(...
         uint256 totalGasFeePaid = BUNDLER.addr.balance - initialBundlerBalance;
-        uint256 gasPaidBySponsor = initialSponsorAccountPaymasterBalance - sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr);
-        uint256 premiumEarnedByFeeCollector = sponsorshipPaymaster.getBalance(PAYMASTER_FEE_COLLECTOR.addr) - initialFeeCollectorBalance; // actualMarkup
+        uint256 gasPaidBySponsor =
+            initialSponsorAccountPaymasterBalance - sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr);
+        uint256 premiumEarnedByFeeCollector =
+            sponsorshipPaymaster.getBalance(PAYMASTER_FEE_COLLECTOR.addr) - initialFeeCollectorBalance; // actualMarkup
         // must be some premium earned
         assertGt(premiumEarnedByFeeCollector, 0);
         uint256 expectedPremium = gasPaidBySponsor * feeMarkup / 1e6;

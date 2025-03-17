@@ -47,7 +47,7 @@ contract TestFuzz_SponsorshipPaymaster is TestBase {
     function testFuzz_Receive(uint256 ethAmount) external prankModifier(ALICE_ADDRESS) {
         vm.assume(ethAmount <= 1000 ether && ethAmount > 0 ether);
         uint256 initialPaymasterBalance = address(sponsorshipPaymaster).balance;
-        (bool success,) = address(sponsorshipPaymaster).call{ value: ethAmount }("");
+        (bool success,) = address(sponsorshipPaymaster).call{value: ethAmount}("");
         assert(success);
         uint256 resultingPaymasterBalance = address(sponsorshipPaymaster).balance;
         assertEq(resultingPaymasterBalance, initialPaymasterBalance + ethAmount);
