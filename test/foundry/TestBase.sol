@@ -254,4 +254,13 @@ abstract contract TestBase is CheatCodes, TestHelper, BaseEventsAndErrors {
 
     // Todo: calculateAndAssertAdjustments
     // Todo: getPriceMarkups
+
+    function excludeLastNBytes(bytes memory data, uint256 n) internal pure returns (bytes memory) {
+        require(data.length > n, "Input data is too short");
+        bytes memory result = new bytes(data.length - n);
+        for (uint256 i = 0; i < data.length - n; i++) {
+            result[i] = data[i];
+        }
+        return result;
+    }
 }

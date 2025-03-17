@@ -347,13 +347,85 @@ contract TestSponsorshipPaymaster is TestBase {
         assertEq(sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr), 0 ether);
     }
 
-    // todo
-    // test_depositFor_RevertsIf_DepositIsLessThanMinDeposit
-    // test_ValidatePaymasterAndPostOpWithPriceMarkup
-    // test_ValidatePaymasterAndPostOpWithPriceMarkup_NonEmptyCalldata
-    // test_RevertIf_ValidatePaymasterUserOpWithIncorrectSignatureLength
-    // test_RevertIf_ValidatePaymasterUserOpWithInvalidPriceMarkUp
-    // test_RevertIf_ValidatePaymasterUserOpWithInsufficientDeposit
+    function test_RevertIf_ValidatePaymasterUserOpWithIncorrectSignatureLength() external {
+        sponsorshipPaymaster.depositFor{value: 10 ether}(SPONSOR_ACCOUNT.addr);
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+        PackedUserOperation memory userOp = buildUserOpWithCalldata(ALICE, "", 0, 0);
+
+        uint32 priceMarkup = 1e6;
+
+        SponsorshipPaymasterData memory pmData = SponsorshipPaymasterData({
+            validationGasLimit: 100_000,
+            postOpGasLimit: uint128(55_000),
+            sponsorAccount: SPONSOR_ACCOUNT.addr,
+            validUntil: uint48(block.timestamp + 1 days),
+            validAfter: uint48(block.timestamp),
+            feeMarkup: priceMarkup
+        });
+
+        (userOp.paymasterAndData,) =
+            generateAndSignSponsorshipPaymasterData(userOp, PAYMASTER_SIGNER_A, sponsorshipPaymaster, pmData);
+        userOp.signature = signUserOp(ALICE, userOp);
+
+        userOp.paymasterAndData = excludeLastNBytes(userOp.paymasterAndData, 2);
+        ops[0] = userOp;
+        vm.expectRevert();
+        // cast sig PaymasterSignatureLengthInvalid()
+        // FailedOpWithRevert(0, "AA33 reverted", 0x90bc2302)
+        ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
+    }
+
+    function test_RevertIf_ValidatePaymasterUserOpWithInvalidPriceMarkUp() external {
+        sponsorshipPaymaster.depositFor{value: 10 ether}(SPONSOR_ACCOUNT.addr);
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+        PackedUserOperation memory userOp = buildUserOpWithCalldata(ALICE, "", 0, 0);
+
+        uint32 priceMarkup = 3e6;
+
+        SponsorshipPaymasterData memory pmData = SponsorshipPaymasterData({
+            validationGasLimit: 100_000,
+            postOpGasLimit: uint128(55_000),
+            sponsorAccount: SPONSOR_ACCOUNT.addr,
+            validUntil: uint48(block.timestamp + 1 days),
+            validAfter: uint48(block.timestamp),
+            feeMarkup: priceMarkup
+        });
+
+        (userOp.paymasterAndData,) =
+            generateAndSignSponsorshipPaymasterData(userOp, PAYMASTER_SIGNER_A, sponsorshipPaymaster, pmData);
+        userOp.signature = signUserOp(ALICE, userOp);
+        ops[0] = userOp;
+        vm.expectRevert();
+        // cast sig InvalidPriceMarkup()
+        // FailedOpWithRevert(0, "AA33 reverted", 0x280b6fdc)
+        ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
+    }
+
+    function test_RevertIf_ValidatePaymasterUserOpWithInsufficientDeposit() external {
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+        PackedUserOperation memory userOp = buildUserOpWithCalldata(ALICE, "", 0, 0);
+        uint32 priceMarkup = 1e6;
+        SponsorshipPaymasterData memory pmData = SponsorshipPaymasterData({
+            validationGasLimit: 100_000,
+            postOpGasLimit: uint128(55_000),
+            sponsorAccount: SPONSOR_ACCOUNT.addr,
+            validUntil: uint48(block.timestamp + 1 days),
+            validAfter: uint48(block.timestamp),
+            feeMarkup: priceMarkup
+        });
+        (userOp.paymasterAndData,) =
+            generateAndSignSponsorshipPaymasterData(userOp, PAYMASTER_SIGNER_A, sponsorshipPaymaster, pmData);
+        userOp.signature = signUserOp(ALICE, userOp);
+        ops[0] = userOp;
+        vm.expectRevert();
+        // FailedOp(0, "AA31 paymaster deposit too low")
+        ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
+    }
+
+     function test_depositFor_RevertsIf_DepositIsLessThanMinDeposit() external {
+        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.LowDeposit.selector, MIN_DEPOSIT - 1, MIN_DEPOSIT));
+        sponsorshipPaymaster.depositFor{ value: MIN_DEPOSIT - 1 }(SPONSOR_ACCOUNT.addr);
+    }
 
     function test_Receive() external prankModifier(ALICE_ADDRESS) {
         uint256 initialPaymasterBalance = address(sponsorshipPaymaster).balance;
@@ -476,6 +548,9 @@ contract TestSponsorshipPaymaster is TestBase {
             + uint128(bytes16(userOp.paymasterAndData[PAYMASTER_POSTOP_GAS_OFFSET:PAYMASTER_DATA_OFFSET]));
     }
 
+    // test_ValidatePaymasterAndPostOpWithPriceMarkup
+    // test_ValidatePaymasterAndPostOpWithPriceMarkup_NonEmptyCalldata
+    
     function test_ValidatePaymasterAndPostOpWithoutPriceMarkup() external {
         sponsorshipPaymaster.depositFor{value: 10 ether}(SPONSOR_ACCOUNT.addr);
 
