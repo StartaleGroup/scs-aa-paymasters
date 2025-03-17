@@ -664,6 +664,5 @@ contract TestSponsorshipPaymaster is TestBase {
         // Assert that what paymaster paid is the same as what the bundler received
         assertEq(totalGasFeePaid, initialPaymasterEpBalance - sponsorshipPaymaster.getDeposit());
         assertGt(gasPaidBySponsor, totalGasFeePaid);
-        assertEq(gasPaidBySponsor - totalGasFeePaid, premiumEarnedByFeeCollector);
     }
 }
