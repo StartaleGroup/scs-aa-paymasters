@@ -422,9 +422,13 @@ contract TestSponsorshipPaymaster is TestBase {
         ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
     }
 
-     function test_depositFor_RevertsIf_DepositIsLessThanMinDeposit() external {
-        vm.expectRevert(abi.encodeWithSelector(ISponsorshipPaymasterEventsAndErrors.LowDeposit.selector, MIN_DEPOSIT - 1, MIN_DEPOSIT));
-        sponsorshipPaymaster.depositFor{ value: MIN_DEPOSIT - 1 }(SPONSOR_ACCOUNT.addr);
+    function test_depositFor_RevertsIf_DepositIsLessThanMinDeposit() external {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISponsorshipPaymasterEventsAndErrors.LowDeposit.selector, MIN_DEPOSIT - 1, MIN_DEPOSIT
+            )
+        );
+        sponsorshipPaymaster.depositFor{value: MIN_DEPOSIT - 1}(SPONSOR_ACCOUNT.addr);
     }
 
     function test_Receive() external prankModifier(ALICE_ADDRESS) {
@@ -550,7 +554,7 @@ contract TestSponsorshipPaymaster is TestBase {
 
     // test_ValidatePaymasterAndPostOpWithPriceMarkup
     // test_ValidatePaymasterAndPostOpWithPriceMarkup_NonEmptyCalldata
-    
+
     function test_ValidatePaymasterAndPostOpWithoutPriceMarkup() external {
         sponsorshipPaymaster.depositFor{value: 10 ether}(SPONSOR_ACCOUNT.addr);
 
