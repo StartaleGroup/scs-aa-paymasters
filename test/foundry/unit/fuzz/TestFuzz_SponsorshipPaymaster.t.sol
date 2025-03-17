@@ -6,6 +6,7 @@ import {ISponsorshipPaymaster} from "../../../../src/interfaces/ISponsorshipPaym
 import {SponsorshipPaymaster} from "../../../../src/sponsorship/SponsorshipPaymaster.sol";
 import {ISponsorshipPaymasterEventsAndErrors} from "../../../../src/interfaces/ISponsorshipPaymasterEventsAndErrors.sol";
 import "@account-abstraction/contracts/interfaces/IStakeManager.sol";
+import {MockToken} from "../../mock/MockToken.sol";
 
 contract TestFuzz_SponsorshipPaymaster is TestBase {
     SponsorshipPaymaster public sponsorshipPaymaster;
@@ -41,5 +42,39 @@ contract TestFuzz_SponsorshipPaymaster is TestBase {
         sponsorshipPaymaster.depositFor{value: depositAmount}(SPONSOR_ACCOUNT.addr);
         dappPaymasterBalance = sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr);
         assertEq(dappPaymasterBalance, depositAmount);
+    }
+
+    function testFuzz_Receive(uint256 ethAmount) external prankModifier(ALICE_ADDRESS) {
+        vm.assume(ethAmount <= 1000 ether && ethAmount > 0 ether);
+        uint256 initialPaymasterBalance = address(sponsorshipPaymaster).balance;
+        (bool success,) = address(sponsorshipPaymaster).call{ value: ethAmount }("");
+        assert(success);
+        uint256 resultingPaymasterBalance = address(sponsorshipPaymaster).balance;
+        assertEq(resultingPaymasterBalance, initialPaymasterBalance + ethAmount);
+    }
+
+    function testFuzz_WithdrawEth(uint256 ethAmount) external prankModifier(PAYMASTER_OWNER.addr) {
+        vm.assume(ethAmount <= 1000 ether && ethAmount > 0 ether);
+        vm.deal(address(sponsorshipPaymaster), ethAmount);
+        uint256 initialAliceBalance = ALICE_ADDRESS.balance;
+        sponsorshipPaymaster.withdrawEth(payable(ALICE_ADDRESS), ethAmount);
+        assertEq(ALICE_ADDRESS.balance, initialAliceBalance + ethAmount);
+        assertEq(address(sponsorshipPaymaster).balance, 0 ether);
+    }
+
+    function testFuzz_WithdrawErc20(address target, uint256 amount) external prankModifier(PAYMASTER_OWNER.addr) {
+        vm.assume(target != address(0) && amount <= 1_000_000 * (10 ** 18));
+        MockToken token = new MockToken("Token", "TKN");
+        uint256 mintAmount = amount;
+        token.mint(address(sponsorshipPaymaster), mintAmount);
+        assertEq(token.balanceOf(address(sponsorshipPaymaster)), mintAmount);
+        assertEq(token.balanceOf(ALICE_ADDRESS), 0);
+        vm.expectEmit(true, true, true, true, address(sponsorshipPaymaster));
+        emit ISponsorshipPaymasterEventsAndErrors.TokensWithdrawn(
+            address(token), ALICE_ADDRESS, PAYMASTER_OWNER.addr, mintAmount
+        );
+        sponsorshipPaymaster.withdrawERC20(token, ALICE_ADDRESS, mintAmount);
+        assertEq(token.balanceOf(address(sponsorshipPaymaster)), 0);
+        assertEq(token.balanceOf(ALICE_ADDRESS), mintAmount);
     }
 }

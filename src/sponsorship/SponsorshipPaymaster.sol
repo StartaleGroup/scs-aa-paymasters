@@ -404,6 +404,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
             // Refund excess gas fees
             uint256 refund = prechargedAmount - adjustedGasCost;
             sponsorBalances[sponsorAccount] += refund;
+            // Review: whether to consider this for premium
             emit RefundProcessed(sponsorAccount, refund);
         } else {
             // Handle undercharge scenario

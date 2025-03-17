@@ -556,21 +556,29 @@ contract TestSponsorshipPaymaster is TestBase {
     // test_ValidatePaymasterAndPostOpWithPriceMarkup_NonEmptyCalldata
 
     function test_ValidatePaymasterAndPostOpWithoutPriceMarkup() external {
-        sponsorshipPaymaster.depositFor{value: 10 ether}(SPONSOR_ACCOUNT.addr);
+        assertEq(sponsorshipPaymaster.getBalance(PAYMASTER_FEE_COLLECTOR.addr), 0);
+        // Compute the storage slot for sponsorBalances[PAYMASTER_FEE_COLLECTOR.addr]
+        // 3 is the slot # for sponsorBalances
+        bytes32 mappingSlot = keccak256(abi.encode(PAYMASTER_FEE_COLLECTOR.addr, uint256(3)));
+        uint256 anyBalance = 10000;
+        // This will ensure we are warming the fee collector slot and we are doing calculations right way
+        vm.store(address(sponsorshipPaymaster), mappingSlot, bytes32(anyBalance));
+        assertEq(sponsorshipPaymaster.getBalance(PAYMASTER_FEE_COLLECTOR.addr), anyBalance);
 
+        sponsorshipPaymaster.depositFor{value: 10 ether}(SPONSOR_ACCOUNT.addr);
         startPrank(PAYMASTER_OWNER.addr);
-        sponsorshipPaymaster.setUnaccountedGas(50_000);
+        sponsorshipPaymaster.setUnaccountedGas(11_000);
         stopPrank();
 
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
         // fee markup of 1e6
         (PackedUserOperation memory userOp, bytes32 userOpHash) =
-            createUserOpWithSponsorshipPaymaster(ALICE, sponsorshipPaymaster, 1e6, 55_000);
+            createUserOpWithSponsorshipPaymaster(ALICE, sponsorshipPaymaster, 1e6, 20_000);
         ops[0] = userOp;
 
         uint256 initialBundlerBalance = BUNDLER.addr.balance;
         uint256 initialPaymasterEpBalance = sponsorshipPaymaster.getDeposit();
-        uint256 initialDappPaymasterBalance = sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr);
+        uint256 initialSponsorAccountPaymasterBalance = sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr);
         uint256 initialFeeCollectorBalance = sponsorshipPaymaster.getBalance(PAYMASTER_FEE_COLLECTOR.addr);
 
         // submit userops
@@ -582,7 +590,76 @@ contract TestSponsorshipPaymaster is TestBase {
         ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
         stopPrank();
 
-        // Calculate and assert price markups and gas payments
         // calculateAndAssertAdjustments(...
+        uint256 totalGasFeePaid = BUNDLER.addr.balance - initialBundlerBalance;
+        uint256 gasPaidBySponsor = initialSponsorAccountPaymasterBalance - sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr);
+        uint256 premiumEarnedByFeeCollector = sponsorshipPaymaster.getBalance(PAYMASTER_FEE_COLLECTOR.addr) - initialFeeCollectorBalance; // actualMarkup
+        // must be zero here as we didn't charge any markup
+        assertEq(premiumEarnedByFeeCollector, 0);
+
+        // Assert that what paymaster paid is the same as what the bundler received
+        assertEq(totalGasFeePaid, initialPaymasterEpBalance - sponsorshipPaymaster.getDeposit());
+
+        // Calculate and assert price markups and gas payments
+
+        // Gas paid by dapp is higher than paymaster
+         assertGt(gasPaidBySponsor, totalGasFeePaid);
+
+        // Ensure that max 2% difference between total gas paid + the adjustment premium and gas paid by dapp (from
+        // paymaster)
+        assertApproxEqRel(totalGasFeePaid + premiumEarnedByFeeCollector, gasPaidBySponsor, 0.02e18);
+    }
+
+    function test_ValidatePaymasterAndPostOpWithPriceMarkup() external {
+        assertEq(sponsorshipPaymaster.getBalance(PAYMASTER_FEE_COLLECTOR.addr), 0);
+        // Compute the storage slot for sponsorBalances[PAYMASTER_FEE_COLLECTOR.addr]
+        // 3 is the slot # for sponsorBalances
+        bytes32 mappingSlot = keccak256(abi.encode(PAYMASTER_FEE_COLLECTOR.addr, uint256(3)));
+        uint256 anyBalance = 10000;
+        // This will ensure we are warming the fee collector slot and we are doing calculations right way
+        vm.store(address(sponsorshipPaymaster), mappingSlot, bytes32(anyBalance));
+        assertEq(sponsorshipPaymaster.getBalance(PAYMASTER_FEE_COLLECTOR.addr), anyBalance);
+
+        sponsorshipPaymaster.depositFor{value: 10 ether}(SPONSOR_ACCOUNT.addr);
+        startPrank(PAYMASTER_OWNER.addr);
+        sponsorshipPaymaster.setUnaccountedGas(11_000);
+        stopPrank();
+
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+        // fee markup of 1.1e6
+        uint32 feeMarkup = 1.1e6;
+        (PackedUserOperation memory userOp, bytes32 userOpHash) =
+            createUserOpWithSponsorshipPaymaster(ALICE, sponsorshipPaymaster, feeMarkup, 20_000);
+        ops[0] = userOp;
+
+        uint256 initialBundlerBalance = BUNDLER.addr.balance;
+        uint256 initialPaymasterEpBalance = sponsorshipPaymaster.getDeposit();
+        uint256 initialSponsorAccountPaymasterBalance = sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr);
+        uint256 initialFeeCollectorBalance = sponsorshipPaymaster.getBalance(PAYMASTER_FEE_COLLECTOR.addr);
+
+        // submit userops
+        vm.expectEmit(true, false, false, false, address(sponsorshipPaymaster));
+        emit ISponsorshipPaymasterEventsAndErrors.GasBalanceDeducted(
+            SPONSOR_ACCOUNT.addr, 0, 0, IPaymaster.PostOpMode.opSucceeded
+        );
+        startPrank(BUNDLER.addr);
+        ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
+        stopPrank();
+
+        // calculateAndAssertAdjustments(...
+        uint256 totalGasFeePaid = BUNDLER.addr.balance - initialBundlerBalance;
+        uint256 gasPaidBySponsor = initialSponsorAccountPaymasterBalance - sponsorshipPaymaster.getBalance(SPONSOR_ACCOUNT.addr);
+        uint256 premiumEarnedByFeeCollector = sponsorshipPaymaster.getBalance(PAYMASTER_FEE_COLLECTOR.addr) - initialFeeCollectorBalance; // actualMarkup
+        // must be some premium earned
+        assertGt(premiumEarnedByFeeCollector, 0);
+        uint256 expectedPremium = gasPaidBySponsor * feeMarkup / 1e6;
+
+        // Review
+        // assertEq(expectedPremium, premiumEarnedByFeeCollector);
+
+        // Assert that what paymaster paid is the same as what the bundler received
+        assertEq(totalGasFeePaid, initialPaymasterEpBalance - sponsorshipPaymaster.getDeposit());
+        assertGt(gasPaidBySponsor, totalGasFeePaid);
+        assertEq(gasPaidBySponsor - totalGasFeePaid, premiumEarnedByFeeCollector);
     }
 }
