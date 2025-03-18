@@ -5,6 +5,7 @@ We need consistent msg.sender with unused 0 nonce on the chain to be deployed.
 Startale will maintain an EOA address that would deploy the deployer contract.
 
 another funding EOA can fund deployer deployer EOA as part of the script then Create3 Deployer is deployed.
+(current deployer deployer EOA : 0xd3F344fd7461f55Bb4A78B37b622DBf4112263F4)
 
 Startale Deployer: https://soneium-minato.blockscout.com/address/0x3C02c039a7f38699bC548D0f324c92bD7FeA7800?tab=contract
 
