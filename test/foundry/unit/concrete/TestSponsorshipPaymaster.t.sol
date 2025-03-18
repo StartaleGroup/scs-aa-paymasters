@@ -567,7 +567,7 @@ contract TestSponsorshipPaymaster is TestBase {
 
         sponsorshipPaymaster.depositFor{value: 10 ether}(SPONSOR_ACCOUNT.addr);
         startPrank(PAYMASTER_OWNER.addr);
-        sponsorshipPaymaster.setUnaccountedGas(11_000);
+        sponsorshipPaymaster.setUnaccountedGas(15_000);
         stopPrank();
 
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
