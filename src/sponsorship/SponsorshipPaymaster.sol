@@ -77,6 +77,11 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         unaccountedGas = _unaccountedGas;
     }
 
+    receive() external payable {
+        // do nothing
+        // unnecessary to emit emit that consume gas
+    }
+
     function _checkConstructorArgs(address _feeCollectorArg, uint256 _unaccountedGasArg) internal view {
         // Checks for constructor arguments
         // Ensure feeCollector is not zero address
@@ -98,6 +103,8 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
      * @notice Requires first-time deposit to be greater than `minDeposit`.
      */
     function depositFor(address _sponsorAccount) external payable nonReentrant {
+        // check zero address for deposit
+        if (_sponsorAccount == address(0)) revert InvalidDepositAddress();
         // cache msg.value in a variable. https://www.evm.codes/ is a good resource for gas costs
         uint256 depositAmount = msg.value;
 
@@ -182,7 +189,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
      * @param newFeeCollector The new fee collector address.
      */
     function setFeeCollector(address newFeeCollector) external payable onlyOwner {
-        require(newFeeCollector != address(0), "Invalid feeCollector address");
+        if (newFeeCollector == address(0)) revert FeeCollectorCanNotBeZero();
         address oldFeeCollector = feeCollector;
         feeCollector = newFeeCollector;
         emit FeeCollectorChanged(oldFeeCollector, newFeeCollector);
@@ -296,6 +303,10 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
             revert PaymasterSignatureLengthInvalid();
         }
 
+        if (unaccountedGas > _userOp.unpackPostOpGasLimit()) {
+            revert PostOpGasLimitTooLow();
+        }
+
         address recoveredSigner = (
             (getHash(_userOp, sponsorAccount, validUntil, validAfter, feeMarkup).toEthSignedMessageHash()).tryRecover(
                 signature
@@ -317,6 +328,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         }
 
         // Calculate the max penalty to ensure the paymaster doesn't underpay
+        // Note: This is just a check to approximate max charge including penalty
         uint256 maxPenalty = (
             (
                 uint128(uint256(_userOp.accountGasLimits))
@@ -336,7 +348,15 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         sponsorBalances[sponsorAccount] -= (effectiveCost + maxPenalty);
         emit UserOperationSponsored(_userOpHash, _userOp.getSender());
 
-        return (abi.encode(sponsorAccount, feeMarkup, effectiveCost), validationData);
+        // Save some state to help calculate the expected penalty during postOp
+        uint256 preOpGasApproximation = _userOp.preVerificationGas + _userOp.unpackVerificationGasLimit()
+            + _userOp.unpackPaymasterVerificationGasLimit();
+        uint256 executionGasLimit = _userOp.unpackCallGasLimit() + _userOp.unpackPostOpGasLimit();
+
+        return (
+            abi.encode(sponsorAccount, feeMarkup, effectiveCost + maxPenalty, preOpGasApproximation, executionGasLimit),
+            validationData
+        );
     }
 
     /**
@@ -351,11 +371,30 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         internal
         override
     {
-        (address sponsorAccount, uint32 feeMarkup, uint256 prechargedAmount) =
-            abi.decode(context, (address, uint32, uint256));
+        (
+            address sponsorAccount,
+            uint32 feeMarkup,
+            uint256 prechargedAmount,
+            uint256 preOpGasApproximation,
+            uint256 executionGasLimit
+        ) = abi.decode(context, (address, uint32, uint256, uint256, uint256));
+
+        uint256 actualGas = actualGasCost / actualUserOpFeePerGas;
+
+        uint256 executionGasUsed;
+        if (actualGas + unaccountedGas > preOpGasApproximation) {
+            executionGasUsed = actualGas + unaccountedGas - preOpGasApproximation;
+        }
+
+        uint256 expectedPenaltyGas;
+        if (executionGasLimit > executionGasUsed) {
+            expectedPenaltyGas = (executionGasLimit - executionGasUsed) * 10 / 100;
+        }
+        // Review: could emit expected penalty gas
+
         // Include unaccountedGas since EP doesn't include this in actualGasCost
         // unaccountedGas = postOpGas + EP overhead gas
-        actualGasCost = actualGasCost + (unaccountedGas * actualUserOpFeePerGas);
+        actualGasCost = actualGasCost + ((unaccountedGas + expectedPenaltyGas) * actualUserOpFeePerGas);
 
         uint256 adjustedGasCost = (actualGasCost * feeMarkup) / FEE_MARKUP_DENOMINATOR;
         uint256 premium = adjustedGasCost - actualGasCost;
@@ -365,6 +404,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
             // Refund excess gas fees
             uint256 refund = prechargedAmount - adjustedGasCost;
             sponsorBalances[sponsorAccount] += refund;
+            // Review: whether to consider this for premium
             emit RefundProcessed(sponsorAccount, refund);
         } else {
             // Handle undercharge scenario
@@ -372,6 +412,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
             sponsorBalances[sponsorAccount] -= deduction;
         }
 
+        // Note: can emit the mode
         emit GasBalanceDeducted(sponsorAccount, actualGasCost, premium, mode);
     }
 
@@ -457,6 +498,8 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         if (value > UNACCOUNTED_GAS_LIMIT) {
             revert UnaccountedGasTooHigh();
         }
+        uint256 oldUnaccountedGas = unaccountedGas;
         unaccountedGas = value;
+        emit UnaccountedGasChanged(oldUnaccountedGas, value);
     }
 }

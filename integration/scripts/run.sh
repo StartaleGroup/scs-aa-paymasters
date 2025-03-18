@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export PAYMASTER_ADDRESS="0x86d0BEc624f0a369F5a57aB35b495F17bE15F3C0"
+export PAYMASTER_ADDRESS="0x14e0E3da8c6911305d29E849693cEaD2B1c8D69B"
 export BUNDLER_URL="http://localhost:3000"
 
 export ENTRY_POINT_ADDRESS="0x0000000071727De22E5E9d8BAf0edAc6f37da032"
@@ -11,4 +11,9 @@ export SIMPLE_ACCOUNT_OWNER_PRIVATE_KEY=$(cat integration/keys/simpleAccount.key
 export PAYMASTER_SIGNER_PRIVATE_KEY=$(cat integration/keys/paymaster.key)
 export PAYMASTER_OWNER_PRIVATE_KEY=$(cat integration/keys/deployer.key)
 
-npm run test
+
+npm run test:integration
+
+#Todo: make setup could only setup rundler
+#And then go straight ahead in running hardhat tests where estimation happens with bundler if client is up. otherwise uses hard coded values
+#npm run test:hardhat

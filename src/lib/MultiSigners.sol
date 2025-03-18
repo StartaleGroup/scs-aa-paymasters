@@ -46,6 +46,8 @@ abstract contract MultiSigners {
     }
 
     function _addSigner(address _signer) internal virtual {
+        if (_signer == address(0)) revert SignerAddressCannotBeZero();
+        if (_isSmartContract(_signer)) revert SignerAddressCannotBeContract();
         signers[_signer] = true;
         emit SignerAdded(_signer);
     }

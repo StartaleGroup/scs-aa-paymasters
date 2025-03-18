@@ -45,7 +45,7 @@ describe("SponsorshipPaymaster", function () {
       owner.address, // _feeCollector
       0, // _minDeposit
       0, // _withdrawalDelay
-      0 // _unaccountedGas
+      80000 // _unaccountedGas
     )) as unknown as SponsorshipPaymaster;
     await sponsorshipPaymaster.waitForDeployment();
   });
