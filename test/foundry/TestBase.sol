@@ -19,6 +19,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {SponsorshipPaymaster} from "../../src/sponsorship/SponsorshipPaymaster.sol";
 import {BaseEventsAndErrors} from "./BaseEventsAndErrors.sol";
+import {IOracleHelper} from "../../src/interfaces/IOracleHelper.sol";
+import {StartaleTokenPaymaster} from "../../src/token/startale/StartaleTokenPaymaster.sol";
+import {IStartaleTokenPaymaster} from "../../src/interfaces/IStartaleTokenPaymaster.sol";
 // Notice: We can add a base contract for required events and errors for the paymasters
 
 abstract contract TestBase is CheatCodes, TestHelper, BaseEventsAndErrors {
@@ -48,6 +51,17 @@ abstract contract TestBase is CheatCodes, TestHelper, BaseEventsAndErrors {
         uint48 validUntil;
         uint48 validAfter;
         uint32 feeMarkup;
+    }
+
+    struct TokenPaymasterDataExternalMode {
+        uint128 validationGasLimit;
+        uint128 postOpGasLimit;
+        IStartaleTokenPaymaster.PaymasterMode mode;
+        uint48 validUntil;
+        uint48 validAfter;
+        address tokenAddress;
+        uint256 exchangeRate;
+        uint48 appliedFeeMarkup;
     }
 
     struct StartaleTokenPaymasterData {
@@ -186,6 +200,63 @@ abstract contract TestBase is CheatCodes, TestHelper, BaseEventsAndErrors {
         userOpHash = ENTRYPOINT.getUserOpHash(userOp);
     }
 
+
+    function createUserOpWithTokenPaymasterAndExternalMode(
+        Vm.Wallet memory sender,
+        StartaleTokenPaymaster paymaster,
+        address tokenAddress,
+        uint256 exchangeRate,
+        uint48 appliedFeeMarkup,
+        uint128 postOpGasLimitOverride,
+        bytes memory userOpCalldata
+    ) internal returns (PackedUserOperation memory userOp, bytes32 userOpHash) {
+        // Create userOp with no gas estimates
+        userOp = buildUserOpWithCalldata(sender, userOpCalldata, 0, 0);
+
+        TokenPaymasterDataExternalMode memory pmData = TokenPaymasterDataExternalMode({
+            validationGasLimit: uint128(100_000),
+            postOpGasLimit: uint128(postOpGasLimitOverride),
+            mode: IStartaleTokenPaymaster.PaymasterMode.EXTERNAL,
+            validUntil: uint48(block.timestamp + 1 days),
+            validAfter: uint48(block.timestamp),
+            tokenAddress: tokenAddress,
+            exchangeRate: exchangeRate,
+            appliedFeeMarkup: appliedFeeMarkup
+        });
+
+        bytes memory pmSignature;
+
+        (userOp.paymasterAndData, pmSignature) =
+            generateAndSignTokenPaymasterDataExternalMode(userOp, PAYMASTER_SIGNER_A, paymaster, pmData);
+        userOp.signature = signUserOp(sender, userOp);
+        userOpHash = ENTRYPOINT.getUserOpHash(userOp);
+    }
+
+    function createUserOpWithTokenPaymasterAndIndependentMode(
+        Vm.Wallet memory sender,
+        StartaleTokenPaymaster paymaster,
+        address tokenAddress,
+        uint128 postOpGasLimitOverride,
+        bytes memory userOpCalldata
+    ) internal returns (PackedUserOperation memory userOp, bytes32 userOpHash) {
+        // Create userOp with no gas estimates
+        userOp = buildUserOpWithCalldata(sender, userOpCalldata, 0, 0);
+
+        bytes memory pmData = abi.encodePacked(
+            address(paymaster),
+            uint128(100_000),
+            uint128(postOpGasLimitOverride),
+            uint8(IStartaleTokenPaymaster.PaymasterMode.INDEPENDENT),
+            tokenAddress
+        );
+
+        userOp.paymasterAndData = pmData;
+        userOp.signature = signUserOp(sender, userOp);
+        userOpHash = ENTRYPOINT.getUserOpHash(userOp); 
+    }
+    
+    
+
     /// @notice Generates and signs the paymaster data for a user operation.
     /// @dev This function prepares the `paymasterAndData` field for a `PackedUserOperation` with the correct signature.
     /// @param userOp The user operation to be signed.
@@ -229,6 +300,50 @@ abstract contract TestBase is CheatCodes, TestHelper, BaseEventsAndErrors {
             pmData.validUntil,
             pmData.validAfter,
             pmData.feeMarkup,
+            signature
+        );
+    }
+
+    function generateAndSignTokenPaymasterDataExternalMode(
+        PackedUserOperation memory userOp,
+        Vm.Wallet memory signer,
+        StartaleTokenPaymaster paymaster,
+        TokenPaymasterDataExternalMode memory pmData
+    ) internal view returns (bytes memory finalPmData, bytes memory signature) {
+        // Initial paymaster data with zero signature
+        userOp.paymasterAndData = abi.encodePacked(
+            address(paymaster),
+            pmData.validationGasLimit,
+            pmData.postOpGasLimit,
+            uint8(pmData.mode),
+            pmData.validUntil,
+            pmData.validAfter,
+            pmData.tokenAddress,
+            pmData.exchangeRate,
+            pmData.appliedFeeMarkup,
+            new bytes(65) // Zero signature
+        );
+
+        {
+            // Generate hash to be signed
+            bytes32 paymasterHash =
+                paymaster.getHashForExternalMode(userOp, pmData.validUntil, pmData.validAfter, pmData.tokenAddress, pmData.exchangeRate, pmData.appliedFeeMarkup);
+
+            // Sign the hash
+            signature = signMessage(signer, paymasterHash);
+        }
+
+        // Final paymaster data with the actual signature
+        finalPmData = abi.encodePacked(
+            address(paymaster),
+            pmData.validationGasLimit,
+            pmData.postOpGasLimit,
+            uint8(pmData.mode),
+            pmData.validUntil,
+            pmData.validAfter,
+            pmData.tokenAddress,
+            pmData.exchangeRate,
+            pmData.appliedFeeMarkup,
             signature
         );
     }
@@ -278,5 +393,27 @@ abstract contract TestBase is CheatCodes, TestHelper, BaseEventsAndErrors {
             result[i] = data[i];
         }
         return result;
+    }
+
+    function _toSingletonArray(address addr) internal pure returns (address[] memory) {
+        address[] memory array = new address[](1);
+        array[0] = addr;
+        return array;
+    }
+
+    function _toSingletonArray(uint48 element) internal pure returns (uint48[] memory) {
+        uint48[] memory array = new uint48[](1);
+        array[0] = element;
+        return array;
+    }
+
+    function _toSingletonArray(IOracleHelper.TokenOracleConfig memory tokenOracleConfig)
+        internal
+        pure
+        returns (IOracleHelper.TokenOracleConfig[] memory)
+    {
+        IOracleHelper.TokenOracleConfig[] memory array = new IOracleHelper.TokenOracleConfig[](1);
+        array[0] = tokenOracleConfig;
+        return array;
     }
 }

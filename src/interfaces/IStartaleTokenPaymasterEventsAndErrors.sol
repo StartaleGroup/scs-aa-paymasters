@@ -20,6 +20,10 @@ interface IStartaleTokenPaymasterEventsAndErrors {
 
     event TokenOracleConfigUpdated(address indexed token, IOracleHelper.TokenOracleConfig newConfig);
 
+    // Todo: Review what we need to emit in event below
+    event PaidGasInTokens(address indexed user, address indexed token, uint256 tokenCharge, uint48 appliedMarkup, uint256 exchangeRate);
+
+
     // Errors
     /// @notice The paymaster data length is invalid.
     error PaymasterAndDataLengthInvalid();
@@ -50,4 +54,6 @@ interface IStartaleTokenPaymasterEventsAndErrors {
     error PostOpGasLimitTooLow();
 
     error InvalidIndependentModeSpecificData();
+
+    error FailedToChargeTokens(address user, address token, uint256 tokenAmount);
 }
