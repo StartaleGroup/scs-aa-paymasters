@@ -83,7 +83,7 @@ abstract contract PriceOracleHelper {
         require(answer > 0, "TPM: Chainlink price <= 0");
         require(updatedAt >= block.timestamp - _maxOracleRoundAge, "TPM: Incomplete round");
         require(answeredInRound >= roundId, "TPM: Stale price");
-        // Todo: review checking oracle decimals
+        // Todo: review checking oracle decimals. usually both are 8 so that is fine.
         price = uint256(answer);
     }
 

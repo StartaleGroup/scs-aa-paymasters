@@ -93,4 +93,11 @@ src/sponsorship/SponsorshipPaymaster.sol:SponsorshipPaymaster --watch
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Soneium Minato | `0xcE3428634685df52CBc99146593aaB26580D5D10` (salt:`0x90d8084deab30c2a37c45e8d47f49f2f7965183cb6990a98943ef94940681de3`, constructor owner: `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, constructor signers `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, FEE_COLLECTOR `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, MIN_DEPOSIT `1000000000000000`WITHDRAWAL_DELAY `60`, UNACCOUNTED_GAS `11000`) |
 
+**Token Paymaster**
 
+deployed with ASTR token support from beginning (Independent mode)
+
+#####Initial draft is deployed at below address
+
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Soneium Minato | `0x68cD8886d2467140509241F58B3Be071df3473ed.` (salt:`0x90d8084deab30c2a37c45e8d47f49f2f7965183cb6990a98943ef94940681de3`, constructor owner: `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, constructor signers `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, TOKEN_FEE_TREASURY`0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, UNACCOUNTED_GAS `11000`), ASTR_ADDRESS `0x26e6f7c7047252DdE3dcBF26AA492e6a264Db655` | ASTR_USD_FEED_ADDRESS `0x1e13086Ca715865e4d89b280e3BB6371dD48DabA` | ETH_USD_FEED_ADDRESS `0xCA50964d2Cf6366456a607E5e1DBCE381A8BA807` 
