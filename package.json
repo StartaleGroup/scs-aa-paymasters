@@ -12,7 +12,8 @@
     "clean:hardhat": "hardhat clean",
     "compile:forge": "forge build",
     "test:forge": "forge test",
-    "clean:forge": "forge clean"
+    "clean:forge": "forge clean",
+    "test:integration": "mocha --exit --timeout 60000"
   },
   "repository": {
     "type": "git",

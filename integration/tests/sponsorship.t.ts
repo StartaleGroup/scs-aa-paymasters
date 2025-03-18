@@ -32,7 +32,8 @@ const __dirname = import.meta.dirname;
 
 dotenv.config();
 
-const MOCK_FUNDING_ID = "0x0000000000000000000000000000000000001234" as Address;
+const MOCK_SPONSOR_ACCOUNT =
+  "0x0000000000000000000000000000000000001234" as Address;
 const MOCK_VALID_UNTIL = 0;
 const MOCK_VALID_AFTER = 0;
 const MOCK_SIG = "0x1234";
@@ -40,11 +41,11 @@ const MOCK_SIG = "0x1234";
 const MOCK_DYNAMIC_ADJUSTMENT = 1100000;
 
 const DUMMY_PAYMASTER_VERIFICATION_GAS_LIMIT = BigInt(251165);
-const DUMMY_PAYMASTER_POST_OP_GAS_LIIMIT = BigInt(46908);
+const DUMMY_PAYMASTER_POST_OP_GAS_LIIMIT = BigInt(100000);
 
 function getPaymasterData(validUntil: number, validAfter: number) {
   const data = {
-    sponsorAccount: MOCK_FUNDING_ID,
+    sponsorAccount: MOCK_SPONSOR_ACCOUNT,
     validUntil,
     validAfter,
     feeMarkup: MOCK_DYNAMIC_ADJUSTMENT,
@@ -181,6 +182,8 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
       }),
     });
 
+    console.log("paymaster address ", paymasterAddress);
+
     // Deposit ETH to Paymaster address in EntryPoint contract
     // @ts-ignore
     await walletClient.sendTransaction({
@@ -194,11 +197,23 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
       }),
     });
 
+    // Todo: Review below action and type errors.
+    await walletClient.sendTransaction({
+      account: defaultWalletAddress,
+      to: paymasterAddress,
+      value: parseEther("1"),
+      data: encodeFunctionData({
+        abi: sponsorshipPaymasterAbi,
+        functionName: "depositFor",
+        args: [MOCK_SPONSOR_ACCOUNT],
+      }),
+    });
+
     const currentDeposit = await publicClient.readContract({
       address: paymasterAddress,
       abi: sponsorshipPaymasterAbi,
       functionName: "getBalance",
-      args: [MOCK_FUNDING_ID],
+      args: [MOCK_SPONSOR_ACCOUNT],
     });
     console.log("currentDeposit ", currentDeposit);
   });
@@ -218,9 +233,9 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
         ],
         [
           paymasterAddress,
-          BigInt(1500),
-          BigInt(1500),
-          MOCK_FUNDING_ID,
+          BigInt(100000),
+          BigInt(100000),
+          MOCK_SPONSOR_ACCOUNT,
           MOCK_VALID_UNTIL,
           MOCK_VALID_AFTER,
           MOCK_DYNAMIC_ADJUSTMENT,
@@ -236,12 +251,12 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
         args: [paymasterAndData],
       });
 
-      expect(res[0]).to.be.equal(MOCK_FUNDING_ID);
+      expect(res[0]).to.be.equal(MOCK_SPONSOR_ACCOUNT);
       expect(res[1]).to.be.equal(MOCK_VALID_UNTIL);
       expect(res[2]).to.be.equal(MOCK_VALID_AFTER);
       expect(res[3]).to.be.equal(MOCK_DYNAMIC_ADJUSTMENT);
-      expect(res[4]).to.be.equal(BigInt(1500));
-      expect(res[5]).to.be.equal(BigInt(1500));
+      expect(res[4]).to.be.equal(BigInt(100000));
+      expect(res[5]).to.be.equal(BigInt(100000));
       expect(res[6]).to.be.equal(MOCK_SIG);
     });
   });
@@ -311,7 +326,7 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
       // Todo: Review type complaints
       baseUserOp = await fillPaymasterDataSignature(
         baseUserOp,
-        MOCK_FUNDING_ID,
+        MOCK_SPONSOR_ACCOUNT,
         MOCK_VALID_UNTIL,
         MOCK_VALID_AFTER,
         MOCK_DYNAMIC_ADJUSTMENT
@@ -339,7 +354,7 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
       // @ts-ignore
       userOp = await fillPaymasterDataSignature(
         userOp,
-        MOCK_FUNDING_ID,
+        MOCK_SPONSOR_ACCOUNT,
         MOCK_VALID_UNTIL,
         MOCK_VALID_AFTER,
         MOCK_DYNAMIC_ADJUSTMENT
