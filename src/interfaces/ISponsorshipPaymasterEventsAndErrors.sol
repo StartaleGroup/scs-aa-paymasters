@@ -17,6 +17,8 @@ interface ISponsorshipPaymasterEventsAndErrors {
     error InvalidWithdrawalAddress();
     error FeeCollectorCanNotBeZero();
     error FeeCollectorCanNotBeContract();
+    error PostOpGasLimitTooLow();
+    error InvalidDepositAddress();
 
     event UserOperationSponsored(bytes32 indexed userOpHash, address indexed user);
     event DepositAdded(address indexed user, uint256 amount);
@@ -27,6 +29,7 @@ interface ISponsorshipPaymasterEventsAndErrors {
     event MinDepositChanged(uint256 oldMinDeposit, uint256 newMinDeposit);
     event RefundProcessed(address indexed user, uint256 amount);
     event EthWithdrawn(address indexed recipient, uint256 amount);
+    event UnaccountedGasChanged(uint256 oldUnaccountedGas, uint256 newUnaccountedGas);
     /**
      * @notice Throws when ETH withdrawal fails
      */
