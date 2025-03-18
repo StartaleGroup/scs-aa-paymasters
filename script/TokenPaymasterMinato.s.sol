@@ -23,13 +23,12 @@ contract DeployTokenPaymasterMinato is Script {
         address nativeAssetToUsdOracle = vm.envAddress("NATIVE_ASSET_TO_USD_ORACLE");
         uint48 nativeAssetMaxOracleRoundAge = uint48(vm.envUint("NATIVE_ASSET_MAX_ORACLE_ROUND_AGE"));
         uint8 nativeAssetDecimals = 18;
-        
+
         // Let's deploy with one Independent Token and more we can add later
         address astrAddress = vm.envAddress("ASTR_TOKEN_ADDERESS_MINATO");
         address astrToUsdOracle = vm.envAddress("ASTR_TO_USD_ORACLE");
         uint48 feeMarkupForIndependentToken = uint48(vm.envUint("FEE_MARKUP_FOR_INDEPENDENT_TOKEN"));
         uint48 astrMaxOracleRoundAge = uint48(vm.envUint("ASTR_MAX_ORACLE_ROUND_AGE"));
-
 
         // Parse signers from comma-separated string
         string[] memory signers = vm.envString("SIGNERS", ",");
@@ -38,7 +37,24 @@ contract DeployTokenPaymasterMinato is Script {
             signersAddr[i] = vm.parseAddress(signers[i]);
         }
 
-        run(salt, owner, signersAddr, feeTreasury, unaccountedGas, nativeAssetToUsdOracle, nativeAssetMaxOracleRoundAge, nativeAssetDecimals, _toSingletonArray(astrAddress), _toSingletonArray(feeMarkupForIndependentToken), _toSingletonArray(IOracleHelper.TokenOracleConfig({tokenOracle: IOracle(address(astrToUsdOracle)), maxOracleRoundAge: astrMaxOracleRoundAge})));
+        run(
+            salt,
+            owner,
+            signersAddr,
+            feeTreasury,
+            unaccountedGas,
+            nativeAssetToUsdOracle,
+            nativeAssetMaxOracleRoundAge,
+            nativeAssetDecimals,
+            _toSingletonArray(astrAddress),
+            _toSingletonArray(feeMarkupForIndependentToken),
+            _toSingletonArray(
+                IOracleHelper.TokenOracleConfig({
+                    tokenOracle: IOracle(address(astrToUsdOracle)),
+                    maxOracleRoundAge: astrMaxOracleRoundAge
+                })
+            )
+        );
     }
 
     function run(
@@ -56,7 +72,17 @@ contract DeployTokenPaymasterMinato is Script {
     ) public {
         vm.startBroadcast();
         StartaleTokenPaymaster pm = new StartaleTokenPaymaster{salt: bytes32(_salt)}(
-            _owner, entryPoint, _signers, _feeTreasury, _unaccountedGas, _nativeAssetToUsdOracle, _nativeAssetMaxOracleRoundAge, _nativeAssetDecimals, _independentTokens, _feeMarkupsForIndependentTokens, _tokenOracleConfigs
+            _owner,
+            entryPoint,
+            _signers,
+            _feeTreasury,
+            _unaccountedGas,
+            _nativeAssetToUsdOracle,
+            _nativeAssetMaxOracleRoundAge,
+            _nativeAssetDecimals,
+            _independentTokens,
+            _feeMarkupsForIndependentTokens,
+            _tokenOracleConfigs
         );
         console.log("Token Paymaster Contract deployed at ", address(pm));
         vm.stopBroadcast();
@@ -83,5 +109,4 @@ contract DeployTokenPaymasterMinato is Script {
         array[0] = tokenOracleConfig;
         return array;
     }
-
 }
