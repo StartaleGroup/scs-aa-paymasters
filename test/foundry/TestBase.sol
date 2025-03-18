@@ -200,7 +200,6 @@ abstract contract TestBase is CheatCodes, TestHelper, BaseEventsAndErrors {
         userOpHash = ENTRYPOINT.getUserOpHash(userOp);
     }
 
-
     function createUserOpWithTokenPaymasterAndExternalMode(
         Vm.Wallet memory sender,
         StartaleTokenPaymaster paymaster,
@@ -252,10 +251,8 @@ abstract contract TestBase is CheatCodes, TestHelper, BaseEventsAndErrors {
 
         userOp.paymasterAndData = pmData;
         userOp.signature = signUserOp(sender, userOp);
-        userOpHash = ENTRYPOINT.getUserOpHash(userOp); 
+        userOpHash = ENTRYPOINT.getUserOpHash(userOp);
     }
-    
-    
 
     /// @notice Generates and signs the paymaster data for a user operation.
     /// @dev This function prepares the `paymasterAndData` field for a `PackedUserOperation` with the correct signature.
@@ -326,8 +323,14 @@ abstract contract TestBase is CheatCodes, TestHelper, BaseEventsAndErrors {
 
         {
             // Generate hash to be signed
-            bytes32 paymasterHash =
-                paymaster.getHashForExternalMode(userOp, pmData.validUntil, pmData.validAfter, pmData.tokenAddress, pmData.exchangeRate, pmData.appliedFeeMarkup);
+            bytes32 paymasterHash = paymaster.getHashForExternalMode(
+                userOp,
+                pmData.validUntil,
+                pmData.validAfter,
+                pmData.tokenAddress,
+                pmData.exchangeRate,
+                pmData.appliedFeeMarkup
+            );
 
             // Sign the hash
             signature = signMessage(signer, paymasterHash);

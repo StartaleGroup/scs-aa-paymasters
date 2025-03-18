@@ -17,6 +17,7 @@ import {IOracleHelper} from "../../interfaces/IOracleHelper.sol";
 import {IWETH} from "@uniswap/swap-router-contracts/contracts/interfaces/IWETH.sol";
 import {TokenPaymasterParserLib} from "../../lib/TokenPaymasterParserLib.sol";
 // TBD/ TODO: Import SwapRoputer and implement methods for sync/manual swaps
+
 contract StartaleTokenPaymaster is
     BasePaymaster,
     MultiSigners,
@@ -263,7 +264,6 @@ contract StartaleTokenPaymaster is
             if (!isValidSig) {
                 return ("", validationData);
             }
-
 
             // @notice Below applies only if we are checking if user has enough balance
             // Calculate max cost in native tokens

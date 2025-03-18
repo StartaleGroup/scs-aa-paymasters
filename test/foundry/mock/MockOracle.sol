@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "../../../src/interfaces/IOracle.sol";
+
 contract MockOracle is IOracle {
     int256 public price;
     uint8 public priceDecimals;

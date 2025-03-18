@@ -4,7 +4,8 @@ pragma solidity ^0.8.28;
 import "../../TestBase.sol";
 import {StartaleTokenPaymaster} from "../../../../src/token/startale/StartaleTokenPaymaster.sol";
 import {IStartaleTokenPaymaster} from "../../../../src/interfaces/IStartaleTokenPaymaster.sol";
-import {IStartaleTokenPaymasterEventsAndErrors} from "../../../../src/interfaces/IStartaleTokenPaymasterEventsAndErrors.sol";
+import {IStartaleTokenPaymasterEventsAndErrors} from
+    "../../../../src/interfaces/IStartaleTokenPaymasterEventsAndErrors.sol";
 import "@account-abstraction/contracts/interfaces/IStakeManager.sol";
 import {MultiSigners} from "../../../../src/lib/MultiSigners.sol";
 import {TestCounter} from "../../TestCounter.sol";
@@ -17,7 +18,6 @@ contract TestTokenPaymaster is TestBase {
     uint256 public constant MIN_DEPOSIT = 1e15;
     uint256 public constant UNACCOUNTED_GAS = 50e3;
     uint48 public constant MAX_ORACLE_ROUND_AGE = 1000;
-
 
     StartaleTokenPaymaster public tokenPaymaster;
     MockOracle public nativeAssetToUsdOracle;
@@ -50,15 +50,13 @@ contract TestTokenPaymaster is TestBase {
             _nativeAssetDecimals: 18,
             _independentTokens: _toSingletonArray(address(testToken)),
             _feeMarkupsForIndependentTokens: _toSingletonArray(1e6),
-            _tokenOracleConfigs: _toSingletonArray(IOracleHelper.TokenOracleConfig({
-                tokenOracle: IOracle(address(tokenToUsdOracle)),
-                maxOracleRoundAge: 1000
-            }))
+            _tokenOracleConfigs: _toSingletonArray(
+                IOracleHelper.TokenOracleConfig({tokenOracle: IOracle(address(tokenToUsdOracle)), maxOracleRoundAge: 1000})
+            )
         });
     }
 
     function test_Deploy_STPM() external {
-
         address[] memory signers = new address[](2);
         signers[0] = PAYMASTER_SIGNER_A.addr;
         signers[1] = PAYMASTER_SIGNER_B.addr;
@@ -74,10 +72,12 @@ contract TestTokenPaymaster is TestBase {
             18, // native token decimals
             _toSingletonArray(address(testToken)),
             _toSingletonArray(1e6),
-            _toSingletonArray(IOracleHelper.TokenOracleConfig({
-                tokenOracle: IOracle(address(tokenToUsdOracle)),
-                maxOracleRoundAge: MAX_ORACLE_ROUND_AGE
-            }))
+            _toSingletonArray(
+                IOracleHelper.TokenOracleConfig({
+                    tokenOracle: IOracle(address(tokenToUsdOracle)),
+                    maxOracleRoundAge: MAX_ORACLE_ROUND_AGE
+                })
+            )
         );
 
         assertEq(testArtifact.owner(), PAYMASTER_OWNER.addr);
@@ -92,13 +92,13 @@ contract TestTokenPaymaster is TestBase {
         uint256 depositAmount = 10 ether;
         assertEq(tokenPaymaster.getDeposit(), 0);
 
-        tokenPaymaster.deposit{ value: depositAmount }();
+        tokenPaymaster.deposit{value: depositAmount}();
         assertEq(tokenPaymaster.getDeposit(), depositAmount);
     }
 
     function test_WithdrawTo() external prankModifier(PAYMASTER_OWNER.addr) {
         uint256 depositAmount = 10 ether;
-        tokenPaymaster.deposit{ value: depositAmount }();
+        tokenPaymaster.deposit{value: depositAmount}();
         uint256 initialBalance = BOB_ADDRESS.balance;
 
         // Withdraw ETH to BOB_ADDRESS and verify the balance changes
@@ -130,7 +130,7 @@ contract TestTokenPaymaster is TestBase {
     }
 
     function test_Success_TokenPaymaster_ExternalMode_WithoutPremium() external {
-        tokenPaymaster.deposit{ value: 10 ether }();
+        tokenPaymaster.deposit{value: 10 ether}();
         testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
 
         vm.startPrank(PAYMASTER_OWNER.addr);
@@ -148,7 +148,6 @@ contract TestTokenPaymaster is TestBase {
 
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
 
-     
         uint48 validUntil = uint48(block.timestamp + 1 days);
         uint48 validAfter = uint48(block.timestamp);
         uint256 tokenPrice = 1e18; // Assume 1 token = 1 native token = 1 USD ?
@@ -157,12 +156,16 @@ contract TestTokenPaymaster is TestBase {
         // Good part of not doing pre-charge and only charging in postOp is we can give approval during the execution phase.
         // So we build a userOp with approve calldata.
         bytes memory userOpCalldata = abi.encodeWithSelector(
-                SimpleAccount.execute.selector, address(testToken), 0, abi.encodeWithSelector(testToken.approve.selector, address(tokenPaymaster), 1000 * 1e18)
+            SimpleAccount.execute.selector,
+            address(testToken),
+            0,
+            abi.encodeWithSelector(testToken.approve.selector, address(tokenPaymaster), 1000 * 1e18)
         );
 
         // Generate and sign the token paymaster data
-        (PackedUserOperation memory userOp, bytes32 userOpHash) =
-            createUserOpWithTokenPaymasterAndExternalMode(ALICE, tokenPaymaster, address(testToken), 1e18, externalFeeMarkup, 100_000, userOpCalldata);
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = createUserOpWithTokenPaymasterAndExternalMode(
+            ALICE, tokenPaymaster, address(testToken), 1e18, externalFeeMarkup, 100_000, userOpCalldata
+        );
 
         ops[0] = userOp;
 
@@ -180,17 +183,18 @@ contract TestTokenPaymaster is TestBase {
 
         uint256 gasPaidBySAInERC20 = initialUserTokenBalance - testToken.balanceOf(address(ALICE_ACCOUNT));
 
-        uint256 gasCollectedInERC20ByFeeCollector = testToken.balanceOf(PAYMASTER_FEE_COLLECTOR.addr) - initialTokenFeeTreasuryBalance;
+        uint256 gasCollectedInERC20ByFeeCollector =
+            testToken.balanceOf(PAYMASTER_FEE_COLLECTOR.addr) - initialTokenFeeTreasuryBalance;
 
         assertEq(gasPaidBySAInERC20, gasCollectedInERC20ByFeeCollector);
 
-       // TODO:
-       // calculateAndAssertAdjustmentsForTokenPaymaster...
+        // TODO:
+        // calculateAndAssertAdjustmentsForTokenPaymaster...
     }
 
     function test_Success_TokenPaymaster_IndependentMode_WithoutPremium() external {
         vm.warp(1742296776);
-        tokenPaymaster.deposit{ value: 10 ether }();
+        tokenPaymaster.deposit{value: 10 ether}();
         testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
 
         vm.startPrank(PAYMASTER_OWNER.addr);
@@ -208,16 +212,19 @@ contract TestTokenPaymaster is TestBase {
 
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
 
-     
         // Good part of not doing pre-charge and only charging in postOp is we can give approval during the execution phase.
         // So we build a userOp with approve calldata.
         bytes memory userOpCalldata = abi.encodeWithSelector(
-                SimpleAccount.execute.selector, address(testToken), 0, abi.encodeWithSelector(testToken.approve.selector, address(tokenPaymaster), 1000 * 1e18)
+            SimpleAccount.execute.selector,
+            address(testToken),
+            0,
+            abi.encodeWithSelector(testToken.approve.selector, address(tokenPaymaster), 1000 * 1e18)
         );
 
         // Generate and sign the token paymaster data
-        (PackedUserOperation memory userOp, bytes32 userOpHash) =
-            createUserOpWithTokenPaymasterAndIndependentMode(ALICE, tokenPaymaster, address(testToken), 100_000, userOpCalldata);
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = createUserOpWithTokenPaymasterAndIndependentMode(
+            ALICE, tokenPaymaster, address(testToken), 100_000, userOpCalldata
+        );
 
         ops[0] = userOp;
 
@@ -235,11 +242,12 @@ contract TestTokenPaymaster is TestBase {
 
         uint256 gasPaidBySAInERC20 = initialUserTokenBalance - testToken.balanceOf(address(ALICE_ACCOUNT));
 
-        uint256 gasCollectedInERC20ByFeeCollector = testToken.balanceOf(PAYMASTER_FEE_COLLECTOR.addr) - initialTokenFeeTreasuryBalance;
+        uint256 gasCollectedInERC20ByFeeCollector =
+            testToken.balanceOf(PAYMASTER_FEE_COLLECTOR.addr) - initialTokenFeeTreasuryBalance;
 
         assertEq(gasPaidBySAInERC20, gasCollectedInERC20ByFeeCollector);
 
-       // TODO:
-       // calculateAndAssertAdjustmentsForTokenPaymaster...
+        // TODO:
+        // calculateAndAssertAdjustmentsForTokenPaymaster...
     }
 }
