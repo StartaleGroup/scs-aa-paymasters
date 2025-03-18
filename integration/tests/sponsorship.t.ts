@@ -32,7 +32,8 @@ const __dirname = import.meta.dirname;
 
 dotenv.config();
 
-const MOCK_FUNDING_ID = "0x0000000000000000000000000000000000001234" as Address;
+const MOCK_SPONSOR_ACCOUNT =
+  "0x0000000000000000000000000000000000001234" as Address;
 const MOCK_VALID_UNTIL = 0;
 const MOCK_VALID_AFTER = 0;
 const MOCK_SIG = "0x1234";
@@ -44,7 +45,7 @@ const DUMMY_PAYMASTER_POST_OP_GAS_LIIMIT = BigInt(100000);
 
 function getPaymasterData(validUntil: number, validAfter: number) {
   const data = {
-    sponsorAccount: MOCK_FUNDING_ID,
+    sponsorAccount: MOCK_SPONSOR_ACCOUNT,
     validUntil,
     validAfter,
     feeMarkup: MOCK_DYNAMIC_ADJUSTMENT,
@@ -204,7 +205,7 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
       data: encodeFunctionData({
         abi: sponsorshipPaymasterAbi,
         functionName: "depositFor",
-        args: [MOCK_FUNDING_ID],
+        args: [MOCK_SPONSOR_ACCOUNT],
       }),
     });
 
@@ -212,7 +213,7 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
       address: paymasterAddress,
       abi: sponsorshipPaymasterAbi,
       functionName: "getBalance",
-      args: [MOCK_FUNDING_ID],
+      args: [MOCK_SPONSOR_ACCOUNT],
     });
     console.log("currentDeposit ", currentDeposit);
   });
@@ -234,7 +235,7 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
           paymasterAddress,
           BigInt(100000),
           BigInt(100000),
-          MOCK_FUNDING_ID,
+          MOCK_SPONSOR_ACCOUNT,
           MOCK_VALID_UNTIL,
           MOCK_VALID_AFTER,
           MOCK_DYNAMIC_ADJUSTMENT,
@@ -250,7 +251,7 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
         args: [paymasterAndData],
       });
 
-      expect(res[0]).to.be.equal(MOCK_FUNDING_ID);
+      expect(res[0]).to.be.equal(MOCK_SPONSOR_ACCOUNT);
       expect(res[1]).to.be.equal(MOCK_VALID_UNTIL);
       expect(res[2]).to.be.equal(MOCK_VALID_AFTER);
       expect(res[3]).to.be.equal(MOCK_DYNAMIC_ADJUSTMENT);
@@ -325,7 +326,7 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
       // Todo: Review type complaints
       baseUserOp = await fillPaymasterDataSignature(
         baseUserOp,
-        MOCK_FUNDING_ID,
+        MOCK_SPONSOR_ACCOUNT,
         MOCK_VALID_UNTIL,
         MOCK_VALID_AFTER,
         MOCK_DYNAMIC_ADJUSTMENT
@@ -353,7 +354,7 @@ describe("EntryPoint v0.7 with SponsorshipPaymaster", () => {
       // @ts-ignore
       userOp = await fillPaymasterDataSignature(
         userOp,
-        MOCK_FUNDING_ID,
+        MOCK_SPONSOR_ACCOUNT,
         MOCK_VALID_UNTIL,
         MOCK_VALID_AFTER,
         MOCK_DYNAMIC_ADJUSTMENT

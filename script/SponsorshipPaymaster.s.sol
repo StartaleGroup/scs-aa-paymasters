@@ -5,7 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 import {SponsorshipPaymaster} from "../src/sponsorship/SponsorshipPaymaster.sol";
 
 contract DeploySponsorshipPaymaster is Script {
-    // Note: When we deploy keep unaccoutedGas around 11000
+    // Note: When we deploy keep unaccountedGas around 11000
     address entryPoint;
 
     function setUp() public {
