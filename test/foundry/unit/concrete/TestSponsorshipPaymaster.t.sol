@@ -6,7 +6,7 @@ import {ISponsorshipPaymaster} from "../../../../src/interfaces/ISponsorshipPaym
 import {SponsorshipPaymaster} from "../../../../src/sponsorship/SponsorshipPaymaster.sol";
 import {ISponsorshipPaymasterEventsAndErrors} from "../../../../src/interfaces/ISponsorshipPaymasterEventsAndErrors.sol";
 import "@account-abstraction/contracts/interfaces/IStakeManager.sol";
-import {MultiSigners} from "../../../../src/sponsorship/MultiSigners.sol";
+import {MultiSigners} from "../../../../src/lib/MultiSigners.sol";
 import {TestCounter} from "../../TestCounter.sol";
 import {MockToken} from "../../mock/MockToken.sol";
 
