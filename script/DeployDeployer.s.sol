@@ -5,43 +5,44 @@ import {Script, console} from "forge-std/Script.sol";
 import {Deployer} from "../src/deployer/Deployer.sol";
 
 contract DeployDeployer is Script {
-    mapping (uint256 => uint256) public DEPLOYMENT_CHAIN_GAS_PRICES; 
+    mapping(uint256 => uint256) public DEPLOYMENT_CHAIN_GAS_PRICES;
+
     function setUp() public {
         DEPLOYMENT_CHAIN_GAS_PRICES[1946] = 0.002 gwei;
     }
 
     function run() public {
-       uint256 DEPLOYMENT_FEE = 0.001 ether; // Deployment fee
-       console.log("DEPLOYMENT_FEE:", DEPLOYMENT_FEE);
+        uint256 DEPLOYMENT_FEE = 0.001 ether; // Deployment fee
+        console.log("DEPLOYMENT_FEE:", DEPLOYMENT_FEE);
 
-       // Load values from `.env`
-       uint256 deployerPrivateKey = vm.envUint("DEPLOYER_CONTRACT_DEPLOYER_PRIVATE_KEY");
-       uint256 fundingPrivateKey = vm.envUint("FUNDING_ACCOUNT_PRIVATE_KEY");
+        // Load values from `.env`
+        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_CONTRACT_DEPLOYER_PRIVATE_KEY");
+        uint256 fundingPrivateKey = vm.envUint("FUNDING_ACCOUNT_PRIVATE_KEY");
 
-       address deployerAddress = vm.addr(deployerPrivateKey);
-       address fundingAddress = vm.addr(fundingPrivateKey);
+        address deployerAddress = vm.addr(deployerPrivateKey);
+        address fundingAddress = vm.addr(fundingPrivateKey);
 
-       console.log("Deployer Address:", deployerAddress);
-       console.log("Funding Address:", fundingAddress);
+        console.log("Deployer Address:", deployerAddress);
+        console.log("Funding Address:", fundingAddress);
 
-       // Get chain ID
-       uint256 chainId = block.chainid;
+        // Get chain ID
+        uint256 chainId = block.chainid;
 
-       uint256 gasPrice = DEPLOYMENT_CHAIN_GAS_PRICES[chainId];
-       require(gasPrice > 0, "No deployment gas price set for this chain");
+        uint256 gasPrice = DEPLOYMENT_CHAIN_GAS_PRICES[chainId];
+        require(gasPrice > 0, "No deployment gas price set for this chain");
 
-       // Compute the contract address of the deployer (nonce = 0)
-       address deployerContractAddress = getContractAddress(deployerAddress, 0);
+        // Compute the contract address of the deployer (nonce = 0)
+        address deployerContractAddress = getContractAddress(deployerAddress, 0);
 
-       console.log("Checking deployer contract at:", deployerContractAddress);
+        console.log("Checking deployer contract at:", deployerContractAddress);
 
-       // Check if contract is already deployed
-       uint256 codeSize;
-       assembly {
+        // Check if contract is already deployed
+        uint256 codeSize;
+        assembly {
             codeSize := extcodesize(deployerContractAddress)
-       }
+        }
 
-       if (codeSize == 0) {
+        if (codeSize == 0) {
             console.log("Deployer contract has not been deployed yet");
 
             uint256 deployerBalance = deployerAddress.balance;
