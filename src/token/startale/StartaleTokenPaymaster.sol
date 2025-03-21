@@ -68,7 +68,7 @@ contract StartaleTokenPaymaster is
         address _tokenFeesTreasury,
         uint256 _unaccountedGas,
         address _nativeAssetToUsdOracle,
-        uint48 _nativeAssetmaxOracleRoundAge,
+        uint48 _nativeAssetMaxOracleRoundAge,
         uint8 _nativeAssetDecimals,
         address[] memory _independentTokens,
         uint48[] memory _feeMarkupsForIndependentTokens,
@@ -79,7 +79,7 @@ contract StartaleTokenPaymaster is
         PriceOracleHelper(
             _nativeAssetToUsdOracle,
             IOracleHelper.NativeOracleConfig({
-                maxOracleRoundAge: _nativeAssetmaxOracleRoundAge,
+                maxOracleRoundAge: _nativeAssetMaxOracleRoundAge,
                 nativeAssetDecimals: _nativeAssetDecimals
             }),
             _independentTokens,
@@ -168,7 +168,7 @@ contract StartaleTokenPaymaster is
         (PaymasterMode mode, bytes calldata modeSpecificData) = _userOp.paymasterAndData.parsePaymasterAndData();
 
         // Note: This changes as/if we add more modes. e.g Permit
-        if (uint8(mode) > 2) {
+        if (uint8(mode) > 1) {
             revert InvalidPaymasterMode();
         }
 
@@ -283,16 +283,6 @@ contract StartaleTokenPaymaster is
             );
 
             return (context, validationData);
-        } else if (mode == PaymasterMode.SPONSORED_POSTPAID) {
-            (bytes memory signature) = modeSpecificData.parseSponsoredPostpaidModeSpecificData();
-            // The hash we verified against would be different than hash calculated for external mode.
-
-            // This mode just goes ahead and pays for the gas.
-            // Signature validation is required here.
-            // No need to send anything in context.
-
-            // for now let's just return empty context and validationData
-            return ("", 0);
         }
     }
 

@@ -46,7 +46,7 @@ contract TestTokenPaymaster is TestBase {
             _tokenFeesTreasury: PAYMASTER_FEE_COLLECTOR.addr,
             _unaccountedGas: UNACCOUNTED_GAS,
             _nativeAssetToUsdOracle: address(nativeAssetToUsdOracle),
-            _nativeAssetmaxOracleRoundAge: MAX_ORACLE_ROUND_AGE,
+            _nativeAssetMaxOracleRoundAge: MAX_ORACLE_ROUND_AGE,
             _nativeAssetDecimals: 18,
             _independentTokens: _toSingletonArray(address(testToken)),
             _feeMarkupsForIndependentTokens: _toSingletonArray(1e6),

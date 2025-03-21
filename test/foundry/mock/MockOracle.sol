@@ -48,7 +48,7 @@ contract MockOracle is IOracle {
         // Generate a random price within the range [minPrice, maxPrice]
         price = minPrice
             + int256(
-                uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty))) % uint256(maxPrice - minPrice + 1)
+                uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao))) % uint256(maxPrice - minPrice + 1)
             );
     }
 
