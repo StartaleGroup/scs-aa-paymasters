@@ -250,4 +250,19 @@ contract TestTokenPaymaster is TestBase {
         // TODO:
         // calculateAndAssertAdjustmentsForTokenPaymaster...
     }
+
+    //TODO:
+    // test_RevertIf_DeployWithSignerSetToZero
+    // test_RevertIf_DeployWithSignerAsContract
+    // test_RevertIf_UnaccountedGasTooHigh
+    // test_RevertIf_InvalidPriceMarkup
+    // test_AddVerifyingSigner
+    // test_RemoveVerifyingSigner
+    // test_RevertIf_SetVerifyingSignerToZero
+    // test_RevertIf_InvalidNativeOracleDecimals
+    // test_RevertIf_InvalidTokenOracleDecimals
+    // test_SetNativeAssetToUsdOracle
+    // test_RevertIf_PriceExpired
+    // test_SetPriceMarkupTooHigh
+    // test_RevertIf_InvalidSignature_ExternalMode
 }
