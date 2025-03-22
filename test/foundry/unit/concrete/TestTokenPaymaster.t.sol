@@ -252,17 +252,46 @@ contract TestTokenPaymaster is TestBase {
     }
 
     //TODO:
+    // test_RevertIf_InvalidTokenAddress
+    // test_RevertIf_InvalidTokenOracle
+    // test_RevertIf_InvalidNativeOracle
+    // test_RevertIf_InvalidOracleConfig
     // test_RevertIf_DeployWithSignerSetToZero
     // test_RevertIf_DeployWithSignerAsContract
     // test_RevertIf_UnaccountedGasTooHigh
-    // test_RevertIf_InvalidPriceMarkup
-    // test_AddVerifyingSigner
-    // test_RemoveVerifyingSigner
     // test_RevertIf_SetVerifyingSignerToZero
     // test_RevertIf_InvalidNativeOracleDecimals
     // test_RevertIf_InvalidTokenOracleDecimals
     // test_SetNativeAssetToUsdOracle
     // test_RevertIf_PriceExpired
-    // test_SetPriceMarkupTooHigh
     // test_RevertIf_InvalidSignature_ExternalMode
+
+    function test_SetPriceMarkupTooHigh() external prankModifier(PAYMASTER_OWNER.addr) {
+        vm.expectRevert(IStartaleTokenPaymasterEventsAndErrors.FeeMarkupTooHigh.selector);
+        tokenPaymaster.addSupportedToken(
+            address(testToken),
+            2e6 + 1,
+            IOracleHelper.TokenOracleConfig({tokenOracle: IOracle(address(tokenToUsdOracle)), maxOracleRoundAge: 1000})
+        );
+    }
+
+    function test_AddVerifyingSigner() external prankModifier(PAYMASTER_OWNER.addr) {
+        assertEq(tokenPaymaster.isSigner(PAYMASTER_SIGNER_A.addr), true);
+        assertEq(tokenPaymaster.isSigner(PAYMASTER_SIGNER_B.addr), true);
+        address newSigner = address(0x123);
+        assertEq(tokenPaymaster.isSigner(newSigner), false);
+        vm.expectEmit(true, true, false, true, address(tokenPaymaster));
+        emit MultiSigners.SignerAdded(newSigner);
+        tokenPaymaster.addSigner(newSigner);
+        assertEq(tokenPaymaster.isSigner(newSigner), true);
+    }
+
+    function test_RemoveVerifyingSigner() external prankModifier(PAYMASTER_OWNER.addr) {
+        assertEq(tokenPaymaster.isSigner(PAYMASTER_SIGNER_A.addr), true);
+        assertEq(tokenPaymaster.isSigner(PAYMASTER_SIGNER_B.addr), true);
+        vm.expectEmit(true, true, false, true, address(tokenPaymaster));
+        emit MultiSigners.SignerRemoved(PAYMASTER_SIGNER_B.addr);
+        tokenPaymaster.removeSigner(PAYMASTER_SIGNER_B.addr);
+        assertEq(tokenPaymaster.isSigner(PAYMASTER_SIGNER_B.addr), false);
+    }
 }

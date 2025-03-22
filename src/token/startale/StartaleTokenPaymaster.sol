@@ -411,6 +411,7 @@ contract StartaleTokenPaymaster is
         private
     {
         if (token == address(0)) revert InvalidTokenAddress();
+        ///@notice We can add a check here to ensure the fee markup is not too low.
         if (feeMarkup > MAX_FEE_MARKUP) revert FeeMarkupTooHigh();
         if (tokenConfigs[token].isEnabled) revert TokenAlreadySupported();
 
