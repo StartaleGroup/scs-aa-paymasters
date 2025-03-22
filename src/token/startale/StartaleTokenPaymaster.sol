@@ -220,7 +220,7 @@ contract StartaleTokenPaymaster is
                 maxPenalty, // may not need to pass.
                 preOpGasApproximation,
                 executionGasLimit,
-                uint256(0), // exchangeRate. non-zero in case we solely rely on postOp to call oracle
+                uint256(0), // exchangeRate. zero in case we solely rely on postOp to call oracle
                 feeMarkup
             );
             uint256 validationData = _packValidationData(false, 0, 0);

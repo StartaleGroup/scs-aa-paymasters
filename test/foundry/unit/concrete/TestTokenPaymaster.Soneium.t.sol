@@ -31,7 +31,7 @@ contract TestTokenPaymasterSoneium is TestBase {
     // MockToken public testToken;
 
     function setUp() public {
-        uint256 forkId = vm.createFork("https://soneium.rpc.scs.startale.com?apikey=hIUL3bN2oqxfuMBHSLXjYT1FK76v1jgK");
+        uint256 forkId = vm.createFork("https://rpc.soneium.org");
         vm.selectFork(forkId);
 
         console2.log(block.timestamp);

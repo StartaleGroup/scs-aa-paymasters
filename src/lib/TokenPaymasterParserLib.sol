@@ -46,14 +46,4 @@ library TokenPaymasterParserLib {
         appliedFeeMarkup = uint48(bytes6(modeSpecificData[64:70]));
         signature = modeSpecificData[70:];
     }
-
-    function parseSponsoredPostpaidModeSpecificData(bytes calldata modeSpecificData)
-        internal
-        pure
-        returns (bytes calldata signature)
-    {
-        // TBD
-        // Probably just a signature. along with maybe some identifier.
-        signature = modeSpecificData[:];
-    }
 }
