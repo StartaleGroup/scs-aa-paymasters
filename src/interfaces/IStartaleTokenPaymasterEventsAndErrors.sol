@@ -57,4 +57,6 @@ interface IStartaleTokenPaymasterEventsAndErrors {
     error InvalidIndependentModeSpecificData();
 
     error FailedToChargeTokens(address user, address token, uint256 tokenAmount);
+
+    error InvalidTokenFeesTreasury();
 }

@@ -370,7 +370,7 @@ abstract contract TestBase is CheatCodes, TestHelper, BaseEventsAndErrors {
         return penalty;
     }
 
-    // Todo: calculateAndAssertAdjustments
+    // Todo: calculateAndAssertAdjustments helper could be added.
 
     function getPriceMarkups(
         SponsorshipPaymaster paymaster,

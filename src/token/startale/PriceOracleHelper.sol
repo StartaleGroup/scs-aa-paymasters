@@ -7,6 +7,10 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 
 abstract contract PriceOracleHelper {
     error NoOracleConfiguredForToken(address token);
+    error PriceShouldBePositive();
+    error IncompleteRound();
+    error StalePrice();
+    error OracleDecimalsMismatch();
 
     IOracle public nativeAssetToUsdOracle; // ETH -> USD price oracle
     IOracleHelper.NativeOracleConfig public nativeOracleConfig;
@@ -44,12 +48,7 @@ abstract contract PriceOracleHelper {
      */
     function _updateNativeOracleConfig(IOracleHelper.NativeOracleConfig calldata newConfig) internal {
         nativeOracleConfig = newConfig;
-        emit IOracleHelper.NativeOracleConfigUpdated(
-            IOracleHelper.TokenOracleConfig({
-                tokenOracle: nativeAssetToUsdOracle,
-                maxOracleRoundAge: newConfig.maxOracleRoundAge
-            })
-        );
+        emit IOracleHelper.NativeOracleConfigUpdated(newConfig);
     }
 
     /**
@@ -80,20 +79,24 @@ abstract contract PriceOracleHelper {
     /// @return price The latest price fetched from the Oracle.
     function fetchPrice(IOracle _oracle, uint48 _maxOracleRoundAge) internal view returns (uint256 price) {
         (uint80 roundId, int256 answer,, uint256 updatedAt, uint80 answeredInRound) = _oracle.latestRoundData();
-        require(answer > 0, "TPM: Chainlink price <= 0");
-        require(updatedAt >= block.timestamp - _maxOracleRoundAge, "TPM: Incomplete round");
-        require(answeredInRound >= roundId, "TPM: Stale price");
-        // Todo: review checking oracle decimals. usually both are 8 so that is fine.
+        if (answer <= 0) revert PriceShouldBePositive();
+        if (updatedAt < block.timestamp - _maxOracleRoundAge) revert IncompleteRound();
+        if (answeredInRound < roundId) revert StalePrice();
+        /// @notice We check if the oracle decimals are the same as the native asset decimals.
+        /// @dev Usually both are 8 so that is fine. But we could allow different decimals for the oracles by including them in the formula.
+        if (IOracle(_oracle).decimals() != IOracle(nativeAssetToUsdOracle).decimals()) revert OracleDecimalsMismatch();
         price = uint256(answer);
     }
 
     /// 1 native token to x number of token in wei.
+    /// @dev We fetch the price of the token and the native asset and then convert the price of the token to the price of the native asset.
+    /// @param token The token address
+    /// @return exchangeRate The exchange rate of the token to the native asset
     function getExchangeRate(address token) public view returns (uint256 exchangeRate) {
         IOracleHelper.TokenOracleConfig memory config = tokenOracleConfigurations[token];
         if (address(config.tokenOracle) == address(0)) revert NoOracleConfiguredForToken(token);
         uint256 tokenPrice = fetchPrice(config.tokenOracle, config.maxOracleRoundAge);
         uint256 nativePrice = fetchPrice(nativeAssetToUsdOracle, nativeOracleConfig.maxOracleRoundAge);
-        // Note: We could store token decimals in the tokenOracleConfig, but we don't have a way to set it yet.
         exchangeRate = (nativePrice * 10 ** IERC20Metadata(token).decimals()) / tokenPrice;
     }
 }
