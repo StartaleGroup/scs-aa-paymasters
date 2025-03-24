@@ -192,6 +192,69 @@ contract TestTokenPaymaster is TestBase {
         // calculateAndAssertAdjustmentsForTokenPaymaster...
     }
 
+    function test_Success_TokenPaymaster_ExternalMode_WithPremium() external {
+        tokenPaymaster.deposit{value: 10 ether}();
+        testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
+
+        vm.startPrank(PAYMASTER_OWNER.addr);
+        tokenPaymaster.setUnaccountedGas(70_000);
+        vm.stopPrank();
+
+        // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
+        testToken.mint(PAYMASTER_FEE_COLLECTOR.addr, 100_000 * (10 ** testToken.decimals()));
+
+        uint256 initialBundlerBalance = BUNDLER.addr.balance;
+        uint256 initialPaymasterEpBalance = tokenPaymaster.getDeposit();
+        uint256 initialUserTokenBalance = testToken.balanceOf(address(ALICE_ACCOUNT));
+        uint256 initialPaymasterTokenBalance = testToken.balanceOf(address(tokenPaymaster));
+        uint256 initialTokenFeeTreasuryBalance = testToken.balanceOf(PAYMASTER_FEE_COLLECTOR.addr);
+
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+
+        uint48 validUntil = uint48(block.timestamp + 1 days);
+        uint48 validAfter = uint48(block.timestamp);
+        uint256 tokenPrice = 1e18; // Assume 1 token = 1 native token = 1 USD ?
+        uint32 externalFeeMarkup = 1.2e6; // no premium
+
+        // Good part of not doing pre-charge and only charging in postOp is we can give approval during the execution phase.
+        // So we build a userOp with approve calldata.
+        bytes memory userOpCalldata = abi.encodeWithSelector(
+            SimpleAccount.execute.selector,
+            address(testToken),
+            0,
+            abi.encodeWithSelector(testToken.approve.selector, address(tokenPaymaster), 1000 * 1e18)
+        );
+
+        // Generate and sign the token paymaster data
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = createUserOpWithTokenPaymasterAndExternalMode(
+            ALICE, tokenPaymaster, address(testToken), 1e18, externalFeeMarkup, 100_000, userOpCalldata
+        );
+
+        ops[0] = userOp;
+
+        vm.expectEmit(true, true, false, false, address(tokenPaymaster));
+        emit IStartaleTokenPaymasterEventsAndErrors.PaidGasInTokens(
+            address(ALICE_ACCOUNT), address(testToken), 0, 1e6, 0
+        );
+
+        // Execute the operation
+        startPrank(BUNDLER.addr);
+        uint256 gasValue = gasleft();
+        ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
+        gasValue = gasValue - gasleft();
+        stopPrank();
+
+        uint256 gasPaidBySAInERC20 = initialUserTokenBalance - testToken.balanceOf(address(ALICE_ACCOUNT));
+
+        uint256 gasCollectedInERC20ByFeeCollector =
+            testToken.balanceOf(PAYMASTER_FEE_COLLECTOR.addr) - initialTokenFeeTreasuryBalance;
+
+        assertEq(gasPaidBySAInERC20, gasCollectedInERC20ByFeeCollector);
+
+        // TODO:
+        // calculateAndAssertAdjustmentsForTokenPaymaster...
+    }
+
     function test_Success_TokenPaymaster_IndependentMode_WithoutPremium() external {
         vm.warp(1742296776);
         tokenPaymaster.deposit{value: 10 ether}();
@@ -199,6 +262,66 @@ contract TestTokenPaymaster is TestBase {
 
         vm.startPrank(PAYMASTER_OWNER.addr);
         tokenPaymaster.setUnaccountedGas(70_000);
+        vm.stopPrank();
+
+        // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
+        testToken.mint(PAYMASTER_FEE_COLLECTOR.addr, 100_000 * (10 ** testToken.decimals()));
+
+        uint256 initialBundlerBalance = BUNDLER.addr.balance;
+        uint256 initialPaymasterEpBalance = tokenPaymaster.getDeposit();
+        uint256 initialUserTokenBalance = testToken.balanceOf(address(ALICE_ACCOUNT));
+        uint256 initialPaymasterTokenBalance = testToken.balanceOf(address(tokenPaymaster));
+        uint256 initialTokenFeeTreasuryBalance = testToken.balanceOf(PAYMASTER_FEE_COLLECTOR.addr);
+
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+
+        // Good part of not doing pre-charge and only charging in postOp is we can give approval during the execution phase.
+        // So we build a userOp with approve calldata.
+        bytes memory userOpCalldata = abi.encodeWithSelector(
+            SimpleAccount.execute.selector,
+            address(testToken),
+            0,
+            abi.encodeWithSelector(testToken.approve.selector, address(tokenPaymaster), 1000 * 1e18)
+        );
+
+        // Generate and sign the token paymaster data
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = createUserOpWithTokenPaymasterAndIndependentMode(
+            ALICE, tokenPaymaster, address(testToken), 100_000, userOpCalldata
+        );
+
+        ops[0] = userOp;
+
+        vm.expectEmit(true, true, false, false, address(tokenPaymaster));
+        emit IStartaleTokenPaymasterEventsAndErrors.PaidGasInTokens(
+            address(ALICE_ACCOUNT), address(testToken), 0, 1e6, 0
+        );
+
+        // Execute the operation
+        startPrank(BUNDLER.addr);
+        uint256 gasValue = gasleft();
+        ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
+        gasValue = gasValue - gasleft();
+        stopPrank();
+
+        uint256 gasPaidBySAInERC20 = initialUserTokenBalance - testToken.balanceOf(address(ALICE_ACCOUNT));
+
+        uint256 gasCollectedInERC20ByFeeCollector =
+            testToken.balanceOf(PAYMASTER_FEE_COLLECTOR.addr) - initialTokenFeeTreasuryBalance;
+
+        assertEq(gasPaidBySAInERC20, gasCollectedInERC20ByFeeCollector);
+
+        // TODO:
+        // calculateAndAssertAdjustmentsForTokenPaymaster...
+    }
+
+    function test_Success_TokenPaymaster_IndependentMode_WithPremium() external {
+        vm.warp(1742296776);
+        tokenPaymaster.deposit{value: 10 ether}();
+        testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
+
+        vm.startPrank(PAYMASTER_OWNER.addr);
+        tokenPaymaster.setUnaccountedGas(70_000);
+        tokenPaymaster.updateTokenFeeMarkup(address(testToken), 1.2e6);
         vm.stopPrank();
 
         // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
