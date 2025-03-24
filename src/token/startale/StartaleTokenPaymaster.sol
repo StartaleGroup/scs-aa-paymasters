@@ -117,6 +117,9 @@ contract StartaleTokenPaymaster is
 
     /**
      * @dev pull tokens out of paymaster in case they were sent to the paymaster at any point.
+     * @dev This could happen if someone accidently sends ERC20 to paymaster address and we need to recover them.
+     * @notice tokenFeeTreasury could also be set to paymaster address address itself. In case of manual withdraw to recharge we would use this method
+     * @notice we could also add withdrawMultipleERC20() method to batch withdraw several tokens.
      * @param token the token deposit to withdraw
      * @param target address to send to
      * @param amount amount to withdraw
@@ -190,13 +193,6 @@ contract StartaleTokenPaymaster is
         if (unaccountedGas > _userOp.unpackPostOpGasLimit()) {
             revert PostOpGasLimitTooLow();
         }
-
-        // uint256 maxPenalty = (
-        //     (
-        //         uint128(uint256(_userOp.accountGasLimits))
-        //             + uint128(bytes16(_userOp.paymasterAndData[PAYMASTER_POSTOP_GAS_OFFSET:PAYMASTER_DATA_OFFSET]))
-        //     ) * 10 * _userOp.unpackMaxFeePerGas()
-        // ) / 100;
 
         // Save some state to help calculate the expected penalty during postOp
         uint256 preOpGasApproximation = _userOp.preVerificationGas + _userOp.unpackVerificationGasLimit()
@@ -353,7 +349,8 @@ contract StartaleTokenPaymaster is
         // If exchangeRate is 0, it means it was not set in the validatePaymasterUserOp => independent mode
         // So we need to get the price of the token from the oracle now
         if (exchangeRate == 0) {
-            /// @notice we can add try/catch here or within the method and return 0 if it fails.
+            /// @notice try/catch only works for external calls.
+            // If we want to throw custom error TokenPriceFeedErrored then we have to make staticcall via assembly and throw based on failiure.
             exchangeRate = getExchangeRate(tokenAddress);
             // if exchangeRate is still 0, it means the token is not supported or something went wrong.
             if (exchangeRate == 0) {
