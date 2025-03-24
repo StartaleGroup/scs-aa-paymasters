@@ -21,11 +21,6 @@ interface IStartaleTokenPaymaster is IStartaleTokenPaymasterEventsAndErrors {
 
     }
 
-    // Review
-    // RESERVED, // maybe
-    // INDEPENDENT_WITH_PERMIT
-    // EXTERNAL_WITH_PERMIT ?
-
     // addSigner
     function addSigner(address signer) external payable;
 
