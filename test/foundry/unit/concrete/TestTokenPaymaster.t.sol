@@ -251,20 +251,406 @@ contract TestTokenPaymaster is TestBase {
         // calculateAndAssertAdjustmentsForTokenPaymaster...
     }
 
-    //TODO:
-    // test_RevertIf_InvalidTokenAddress
-    // test_RevertIf_InvalidTokenOracle
-    // test_RevertIf_InvalidNativeOracle
-    // test_RevertIf_InvalidOracleConfig
-    // test_RevertIf_DeployWithSignerSetToZero
-    // test_RevertIf_DeployWithSignerAsContract
-    // test_RevertIf_UnaccountedGasTooHigh
-    // test_RevertIf_SetVerifyingSignerToZero
-    // test_RevertIf_InvalidNativeOracleDecimals
-    // test_RevertIf_InvalidTokenOracleDecimals
-    // test_SetNativeAssetToUsdOracle
-    // test_RevertIf_PriceExpired
-    // test_RevertIf_InvalidSignature_ExternalMode
+    function test_Revert_PostOp_If_PriceExpired() external {
+        tokenToUsdOracle.setUpdatedAtDelay(10000);
+
+        vm.startPrank(PAYMASTER_OWNER.addr);
+        tokenPaymaster.updateTokenOracleConfig(
+            address(testToken),
+            IOracleHelper.TokenOracleConfig({tokenOracle: IOracle(address(tokenToUsdOracle)), maxOracleRoundAge: 1000})
+        );
+        vm.stopPrank();
+
+        vm.warp(1742296776);
+        tokenPaymaster.deposit{value: 10 ether}();
+        testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
+
+        vm.startPrank(PAYMASTER_OWNER.addr);
+        tokenPaymaster.setUnaccountedGas(70_000);
+        vm.stopPrank();
+
+        // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
+        testToken.mint(PAYMASTER_FEE_COLLECTOR.addr, 100_000 * (10 ** testToken.decimals()));
+
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+
+        // Good part of not doing pre-charge and only charging in postOp is we can give approval during the execution phase.
+        // So we build a userOp with approve calldata.
+        bytes memory userOpCalldata = abi.encodeWithSelector(
+            SimpleAccount.execute.selector,
+            address(testToken),
+            0,
+            abi.encodeWithSelector(testToken.approve.selector, address(tokenPaymaster), 1000 * 1e18)
+        );
+
+        // Generate and sign the token paymaster data
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = createUserOpWithTokenPaymasterAndIndependentMode(
+            ALICE, tokenPaymaster, address(testToken), 100_000, userOpCalldata
+        );
+
+        ops[0] = userOp;
+
+        // Execute the operation
+        startPrank(BUNDLER.addr);
+        uint256 gasValue = gasleft();
+
+        vm.expectEmit(false, false, false, false, ENTRYPOINT_ADDRESS);
+        // Review: can emit exact expected values and reason: IncompleteRound
+        emit IEntryPoint.PostOpRevertReason(userOpHash, address(0), 0, new bytes(0));
+
+        ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
+        gasValue = gasValue - gasleft();
+        stopPrank();
+    }
+
+    function test_Revert_PostOp_If_StalePrice() external {
+        tokenToUsdOracle.setAnsweredInRoundId(73_786_976_294_838_215_802 - 100);
+
+        vm.startPrank(PAYMASTER_OWNER.addr);
+        tokenPaymaster.updateTokenOracleConfig(
+            address(testToken),
+            IOracleHelper.TokenOracleConfig({tokenOracle: IOracle(address(tokenToUsdOracle)), maxOracleRoundAge: 1000})
+        );
+        vm.stopPrank();
+
+        vm.warp(1742296776);
+        tokenPaymaster.deposit{value: 10 ether}();
+        testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
+
+        vm.startPrank(PAYMASTER_OWNER.addr);
+        tokenPaymaster.setUnaccountedGas(70_000);
+        vm.stopPrank();
+
+        // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
+        testToken.mint(PAYMASTER_FEE_COLLECTOR.addr, 100_000 * (10 ** testToken.decimals()));
+
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+
+        // Good part of not doing pre-charge and only charging in postOp is we can give approval during the execution phase.
+        // So we build a userOp with approve calldata.
+        bytes memory userOpCalldata = abi.encodeWithSelector(
+            SimpleAccount.execute.selector,
+            address(testToken),
+            0,
+            abi.encodeWithSelector(testToken.approve.selector, address(tokenPaymaster), 1000 * 1e18)
+        );
+
+        // Generate and sign the token paymaster data
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = createUserOpWithTokenPaymasterAndIndependentMode(
+            ALICE, tokenPaymaster, address(testToken), 100_000, userOpCalldata
+        );
+
+        ops[0] = userOp;
+
+        // Execute the operation
+        startPrank(BUNDLER.addr);
+        uint256 gasValue = gasleft();
+
+        vm.expectEmit(false, false, false, false, ENTRYPOINT_ADDRESS);
+        // Review: can emit exact expected values and reason: StalePrice
+        emit IEntryPoint.PostOpRevertReason(userOpHash, address(0), 0, new bytes(0));
+
+        ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
+        gasValue = gasValue - gasleft();
+        stopPrank();
+    }
+
+    function test_RevertIf_InvalidTokenAddress_Independent_Mode() public {
+        MockToken invalidToken = new MockToken("Unsupported", "RANDERC20");
+        vm.warp(1742296776);
+        tokenPaymaster.deposit{value: 10 ether}();
+        invalidToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
+
+        vm.startPrank(PAYMASTER_OWNER.addr);
+        tokenPaymaster.setUnaccountedGas(70_000);
+        vm.stopPrank();
+
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+
+        bytes memory userOpCalldata = abi.encodeWithSelector(
+            SimpleAccount.execute.selector,
+            address(invalidToken),
+            0,
+            abi.encodeWithSelector(invalidToken.approve.selector, address(tokenPaymaster), 1000 * 1e18)
+        );
+
+        // Generate and sign the token paymaster data
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = createUserOpWithTokenPaymasterAndIndependentMode(
+            ALICE, tokenPaymaster, address(invalidToken), 100_000, userOpCalldata
+        );
+
+        ops[0] = userOp;
+
+        startPrank(BUNDLER.addr);
+        uint256 gasValue = gasleft();
+
+        bytes memory expectedRevertReason = abi.encodeWithSelector(
+            IEntryPoint.FailedOpWithRevert.selector,
+            0,
+            "AA33 reverted",
+            abi.encodeWithSelector(
+                IStartaleTokenPaymasterEventsAndErrors.TokenNotSupported.selector, address(invalidToken)
+            )
+        );
+        vm.expectRevert(expectedRevertReason);
+
+        ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
+        gasValue = gasValue - gasleft();
+        stopPrank();
+    }
+
+    function test_RevertIf_UserDoesNotHaveEnoughBalance_Any_Mode() public {
+        vm.warp(1742296776);
+        tokenPaymaster.deposit{value: 10 ether}();
+        // Let's not give ALICE any tokens this time.
+        // This would be a problem in postOp.
+
+        vm.startPrank(PAYMASTER_OWNER.addr);
+        tokenPaymaster.setUnaccountedGas(70_000);
+        vm.stopPrank();
+
+        // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
+        testToken.mint(PAYMASTER_FEE_COLLECTOR.addr, 100_000 * (10 ** testToken.decimals()));
+
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+
+        // Good part of not doing pre-charge and only charging in postOp is we can give approval during the execution phase.
+        // So we build a userOp with approve calldata.
+        bytes memory userOpCalldata = abi.encodeWithSelector(
+            SimpleAccount.execute.selector,
+            address(testToken),
+            0,
+            abi.encodeWithSelector(testToken.approve.selector, address(tokenPaymaster), 1000 * 1e18)
+        );
+
+        // Generate and sign the token paymaster data
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = createUserOpWithTokenPaymasterAndIndependentMode(
+            ALICE, tokenPaymaster, address(testToken), 100_000, userOpCalldata
+        );
+
+        ops[0] = userOp;
+
+        // Execute the operation
+        startPrank(BUNDLER.addr);
+        uint256 gasValue = gasleft();
+
+        vm.expectEmit(false, false, false, false, ENTRYPOINT_ADDRESS);
+        // Review: can emit exact expected values and reason: FailedToChargeTokens
+        /// @note: UserOp does not revert when the postOp reverts.
+        emit IEntryPoint.PostOpRevertReason(userOpHash, address(0), 0, new bytes(0));
+
+        ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
+        gasValue = gasValue - gasleft();
+        stopPrank();
+    }
+
+    function test_Success_test_UpdateNativeOracleConfig() external {
+        vm.startPrank(PAYMASTER_OWNER.addr);
+        vm.expectEmit(true, true, false, false, address(tokenPaymaster));
+        emit IOracleHelper.NativeOracleConfigUpdated(
+            IOracleHelper.NativeOracleConfig({maxOracleRoundAge: 1000, nativeAssetDecimals: 18})
+        );
+        tokenPaymaster.updateNativeOracleConfig(
+            IOracleHelper.NativeOracleConfig({maxOracleRoundAge: 1000, nativeAssetDecimals: 18})
+        );
+        vm.stopPrank();
+    }
+
+    function test_RevertIf_Mismatching_Oracle_Decimals_Independent_Mode() external {
+        vm.warp(1742296776);
+        tokenPaymaster.deposit{value: 10 ether}();
+        testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
+
+        vm.startPrank(PAYMASTER_OWNER.addr);
+        tokenPaymaster.setUnaccountedGas(70_000);
+        vm.stopPrank();
+
+        // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
+        testToken.mint(PAYMASTER_FEE_COLLECTOR.addr, 100_000 * (10 ** testToken.decimals()));
+
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+
+        // Good part of not doing pre-charge and only charging in postOp is we can give approval during the execution phase.
+        // So we build a userOp with approve calldata.
+        bytes memory userOpCalldata = abi.encodeWithSelector(
+            SimpleAccount.execute.selector,
+            address(testToken),
+            0,
+            abi.encodeWithSelector(testToken.approve.selector, address(tokenPaymaster), 1000 * 1e18)
+        );
+
+        tokenToUsdOracle.setPriceDecimals(10);
+
+        vm.startPrank(PAYMASTER_OWNER.addr);
+        vm.expectEmit(true, true, false, false, address(tokenPaymaster));
+        emit IOracleHelper.TokenOracleConfigUpdated(
+            address(testToken),
+            IOracleHelper.TokenOracleConfig({tokenOracle: IOracle(address(tokenToUsdOracle)), maxOracleRoundAge: 500})
+        );
+        tokenPaymaster.updateTokenOracleConfig(
+            address(testToken),
+            IOracleHelper.TokenOracleConfig({tokenOracle: IOracle(address(tokenToUsdOracle)), maxOracleRoundAge: 500})
+        );
+        vm.stopPrank();
+        // Generate and sign the token paymaster data
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = createUserOpWithTokenPaymasterAndIndependentMode(
+            ALICE, tokenPaymaster, address(testToken), 100_000, userOpCalldata
+        );
+
+        ops[0] = userOp;
+
+        // Execute the operation
+        startPrank(BUNDLER.addr);
+        uint256 gasValue = gasleft();
+
+        vm.expectEmit(false, false, false, false, ENTRYPOINT_ADDRESS);
+        // Review: can emit exact expected values and reason: OracleDecimalsMismatch
+        emit IEntryPoint.PostOpRevertReason(userOpHash, address(0), 0, new bytes(0));
+
+        ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
+        gasValue = gasValue - gasleft();
+        stopPrank();
+    }
+
+    function test_RevertIf_DeployWithSignerSetToZero() external {
+        address[] memory signers = new address[](2);
+        signers[0] = PAYMASTER_SIGNER_A.addr;
+        signers[1] = address(0);
+        vm.expectRevert(abi.encodeWithSelector(MultiSigners.SignerAddressCannotBeZero.selector));
+        // Deploy the token paymaster
+        StartaleTokenPaymaster testArtifact = new StartaleTokenPaymaster(
+            PAYMASTER_OWNER.addr,
+            ENTRYPOINT_ADDRESS,
+            signers,
+            PAYMASTER_FEE_COLLECTOR.addr,
+            UNACCOUNTED_GAS, // unaccounted gas
+            address(nativeAssetToUsdOracle),
+            MAX_ORACLE_ROUND_AGE,
+            18, // native token decimals
+            _toSingletonArray(address(testToken)),
+            _toSingletonArray(1e6),
+            _toSingletonArray(
+                IOracleHelper.TokenOracleConfig({
+                    tokenOracle: IOracle(address(tokenToUsdOracle)),
+                    maxOracleRoundAge: MAX_ORACLE_ROUND_AGE
+                })
+            )
+        );
+    }
+
+    function test_RevertIf_UnaccountedGasTooHigh() external prankModifier(PAYMASTER_OWNER.addr) {
+        vm.expectRevert(IStartaleTokenPaymasterEventsAndErrors.UnaccountedGasTooHigh.selector);
+        tokenPaymaster.setUnaccountedGas(100_000_000);
+    }
+
+    function test_Allow_Treasury_ToBeSelf() public {
+        address[] memory signers = new address[](2);
+        signers[0] = PAYMASTER_SIGNER_A.addr;
+        signers[1] = PAYMASTER_SIGNER_B.addr;
+        StartaleTokenPaymaster testArtifact = new StartaleTokenPaymaster(
+            PAYMASTER_OWNER.addr,
+            ENTRYPOINT_ADDRESS,
+            signers,
+            PAYMASTER_FEE_COLLECTOR.addr,
+            UNACCOUNTED_GAS, // unaccounted gas
+            address(nativeAssetToUsdOracle),
+            MAX_ORACLE_ROUND_AGE,
+            18, // native token decimals
+            _toSingletonArray(address(testToken)),
+            _toSingletonArray(1e6),
+            _toSingletonArray(
+                IOracleHelper.TokenOracleConfig({
+                    tokenOracle: IOracle(address(tokenToUsdOracle)),
+                    maxOracleRoundAge: MAX_ORACLE_ROUND_AGE
+                })
+            )
+        );
+
+        vm.startPrank(PAYMASTER_OWNER.addr);
+        testArtifact.setTokenFeesTreasury(address(testArtifact));
+        vm.stopPrank();
+        assertEq(testArtifact.tokenFeesTreasury(), address(testArtifact));
+    }
+
+    function test_RevertIf_FeeTreasuryIsZero() external {
+        address[] memory signers = new address[](2);
+        signers[0] = PAYMASTER_SIGNER_A.addr;
+        signers[1] = PAYMASTER_SIGNER_B.addr;
+        vm.expectRevert(
+            abi.encodeWithSelector(IStartaleTokenPaymasterEventsAndErrors.InvalidTokenFeesTreasury.selector)
+        );
+        // Deploy the token paymaster
+        StartaleTokenPaymaster testArtifact = new StartaleTokenPaymaster(
+            PAYMASTER_OWNER.addr,
+            ENTRYPOINT_ADDRESS,
+            signers,
+            address(0),
+            UNACCOUNTED_GAS, // unaccounted gas
+            address(nativeAssetToUsdOracle),
+            MAX_ORACLE_ROUND_AGE,
+            18, // native token decimals
+            _toSingletonArray(address(testToken)),
+            _toSingletonArray(1e6),
+            _toSingletonArray(
+                IOracleHelper.TokenOracleConfig({
+                    tokenOracle: IOracle(address(tokenToUsdOracle)),
+                    maxOracleRoundAge: MAX_ORACLE_ROUND_AGE
+                })
+            )
+        );
+    }
+
+    function test_RevertIf_InvalidSignature_ExternalMode() external {
+        tokenPaymaster.deposit{value: 10 ether}();
+        testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
+
+        vm.startPrank(PAYMASTER_OWNER.addr);
+        tokenPaymaster.setUnaccountedGas(70_000);
+        vm.stopPrank();
+
+        // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
+        testToken.mint(PAYMASTER_FEE_COLLECTOR.addr, 100_000 * (10 ** testToken.decimals()));
+
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+
+        uint256 exchangeRate = 1e18; // Assume 1 token = 1 native token = 1 USD ?
+        uint32 externalFeeMarkup = 1e6; // no premium
+
+        // Good part of not doing pre-charge and only charging in postOp is we can give approval during the execution phase.
+        // So we build a userOp with approve calldata.
+        bytes memory userOpCalldata = abi.encodeWithSelector(
+            SimpleAccount.execute.selector,
+            address(testToken),
+            0,
+            abi.encodeWithSelector(testToken.approve.selector, address(tokenPaymaster), 1000 * 1e18)
+        );
+
+        // Generate and sign the token paymaster data
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = createUserOpWithTokenPaymasterAndExternalMode(
+            ALICE, tokenPaymaster, address(testToken), exchangeRate, externalFeeMarkup, 100_000, userOpCalldata
+        );
+
+        bytes memory paymasterAndData = userOp.paymasterAndData;
+        // Tamper the signature by altering the last byte
+        paymasterAndData[paymasterAndData.length - 1] = bytes1(uint8(paymasterAndData[paymasterAndData.length - 1]) + 1);
+        userOp.paymasterAndData = paymasterAndData;
+
+        userOp.signature = signUserOp(ALICE, userOp);
+
+        ops[0] = userOp;
+
+        // Execute the operation
+        startPrank(BUNDLER.addr);
+        uint256 gasValue = gasleft();
+
+        bytes memory expectedRevertReason =
+            abi.encodeWithSelector(IEntryPoint.FailedOp.selector, 0, "AA34 signature error");
+        vm.expectRevert(expectedRevertReason);
+
+        ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
+        gasValue = gasValue - gasleft();
+        stopPrank();
+    }
 
     function test_SetPriceMarkupTooHigh() external prankModifier(PAYMASTER_OWNER.addr) {
         vm.expectRevert(IStartaleTokenPaymasterEventsAndErrors.FeeMarkupTooHigh.selector);
@@ -294,4 +680,9 @@ contract TestTokenPaymaster is TestBase {
         tokenPaymaster.removeSigner(PAYMASTER_SIGNER_B.addr);
         assertEq(tokenPaymaster.isSigner(PAYMASTER_SIGNER_B.addr), false);
     }
+
+    // TODO: More Tests Can be Added For..
+    // Invalid Mode
+    // Invalid Signature Length
+    // Invalid Mode Specific Data
 }

@@ -82,9 +82,6 @@ abstract contract PriceOracleHelper {
         if (answer <= 0) revert PriceShouldBePositive();
         if (updatedAt < block.timestamp - _maxOracleRoundAge) revert IncompleteRound();
         if (answeredInRound < roundId) revert StalePrice();
-        /// @notice We check if the oracle decimals are the same as the native asset decimals.
-        /// @dev Usually both are 8 so that is fine. But we could allow different decimals for the oracles by including them in the formula.
-        if (IOracle(_oracle).decimals() != IOracle(nativeAssetToUsdOracle).decimals()) revert OracleDecimalsMismatch();
         price = uint256(answer);
     }
 
@@ -95,6 +92,11 @@ abstract contract PriceOracleHelper {
     function getExchangeRate(address token) public view returns (uint256 exchangeRate) {
         IOracleHelper.TokenOracleConfig memory config = tokenOracleConfigurations[token];
         if (address(config.tokenOracle) == address(0)) revert NoOracleConfiguredForToken(token);
+        /// @notice We check if the oracle decimals are the same as the native asset decimals.
+        /// @dev Usually both are 8 so that is fine. But we could allow different decimals for the oracles by including them in the formula.
+        if (IOracle(config.tokenOracle).decimals() != IOracle(nativeAssetToUsdOracle).decimals()) {
+            revert OracleDecimalsMismatch();
+        }
         uint256 tokenPrice = fetchPrice(config.tokenOracle, config.maxOracleRoundAge);
         uint256 nativePrice = fetchPrice(nativeAssetToUsdOracle, nativeOracleConfig.maxOracleRoundAge);
         exchangeRate = (nativePrice * 10 ** IERC20Metadata(token).decimals()) / tokenPrice;

@@ -50,6 +50,8 @@ interface IStartaleTokenPaymasterEventsAndErrors {
 
     error TokenNotSupported(address token);
 
+    error TokenPriceFeedErrored(address token);
+
     error InvalidPaymasterMode();
 
     error PostOpGasLimitTooLow();

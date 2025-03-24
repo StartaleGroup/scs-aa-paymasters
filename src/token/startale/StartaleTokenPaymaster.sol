@@ -84,7 +84,12 @@ contract StartaleTokenPaymaster is
             revert ArrayLengthMismatch();
         }
 
+        if (_tokenFeesTreasury == address(0)) revert InvalidTokenFeesTreasury();
         tokenFeesTreasury = _tokenFeesTreasury;
+
+        if (_unaccountedGas > UNACCOUNTED_GAS_LIMIT) {
+            revert UnaccountedGasTooHigh();
+        }
         unaccountedGas = _unaccountedGas;
 
         for (uint256 i = 0; i < _independentTokens.length; i++) {
@@ -354,8 +359,7 @@ contract StartaleTokenPaymaster is
             exchangeRate = getExchangeRate(tokenAddress);
             // if exchangeRate is still 0, it means the token is not supported or something went wrong.
             if (exchangeRate == 0) {
-                /// @todo Review error name.
-                revert TokenNotSupported(tokenAddress);
+                revert TokenPriceFeedErrored(tokenAddress);
             }
         }
 

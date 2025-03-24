@@ -7,6 +7,8 @@ contract MockOracle is IOracle {
     int256 public price;
     uint8 public priceDecimals;
     uint256 public updatedAtDelay;
+    uint80 constant MOCK_ROUND_ID = 73_786_976_294_838_215_802;
+    uint80 public answeredInRoundId = MOCK_ROUND_ID;
 
     constructor(int256 _initialPrice, uint8 _decimals) {
         price = _initialPrice;
@@ -28,6 +30,10 @@ contract MockOracle is IOracle {
      */
     function setUpdatedAtDelay(uint256 _updatedAtDelay) external {
         updatedAtDelay = _updatedAtDelay;
+    }
+
+    function setPriceDecimals(uint8 _newDecimals) external {
+        priceDecimals = _newDecimals;
     }
 
     /**
@@ -69,12 +75,16 @@ contract MockOracle is IOracle {
         // console.log("updatedAtDelay", updatedAtDelay);
         // console.log("block.timestamp", block.timestamp);
         return (
-            73_786_976_294_838_215_802, // Mock round ID
+            MOCK_ROUND_ID, // Mock round ID
             price, // The current price
             block.timestamp, // Simulate round started at the current block timestamp
             block.timestamp - updatedAtDelay, // Simulate price last updated with delay
-            73_786_976_294_838_215_802 // Mock round ID for answeredInRound
+            answeredInRoundId // Mock round ID for answeredInRound
         );
+    }
+
+    function setAnsweredInRoundId(uint80 _answeredInRoundId) external {
+        answeredInRoundId = _answeredInRoundId;
     }
 
     function latestAnswer() external view override returns (int256) {
