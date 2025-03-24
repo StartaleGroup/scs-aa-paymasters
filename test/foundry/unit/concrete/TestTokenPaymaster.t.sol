@@ -134,7 +134,8 @@ contract TestTokenPaymaster is TestBase {
         testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
 
         vm.startPrank(PAYMASTER_OWNER.addr);
-        tokenPaymaster.setUnaccountedGas(70_000);
+        // Note: unaccounted gas for external mode is different as there is no call to the oracles.
+        tokenPaymaster.setUnaccountedGas(20_000);
         vm.stopPrank();
 
         // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
@@ -186,10 +187,25 @@ contract TestTokenPaymaster is TestBase {
         uint256 gasCollectedInERC20ByFeeCollector =
             testToken.balanceOf(PAYMASTER_FEE_COLLECTOR.addr) - initialTokenFeeTreasuryBalance;
 
+        // // What user paid = received by paymaster fee collector
+        // unless ofcourse there is same token transfer in calldata
         assertEq(gasPaidBySAInERC20, gasCollectedInERC20ByFeeCollector);
 
-        // TODO:
         // calculateAndAssertAdjustmentsForTokenPaymaster...
+        uint256 totalGasFeePaid = BUNDLER.addr.balance - initialBundlerBalance;
+
+        // Assert that what paymaster paid is the same as what the bundler received
+        assertEq(totalGasFeePaid, initialPaymasterEpBalance - tokenPaymaster.getDeposit());
+
+        uint256 gasPaidBySAInNativeTokens = gasPaidBySAInERC20 * 1e18 / tokenPrice;
+
+        // Assert we never undercharge
+        assertGe(gasPaidBySAInNativeTokens, BUNDLER.addr.balance - initialBundlerBalance);
+
+        // Since there is no premium, the paymaster should have received the same amount of tokens as it paid for
+        // Ensure that max 2% difference between total gas paid + the adjustment premium(if any) and gas paid by dapp (from
+        // paymaster)
+        assertApproxEqRel(totalGasFeePaid, gasPaidBySAInNativeTokens, 0.02e18);
     }
 
     function test_Success_TokenPaymaster_ExternalMode_WithPremium() external {
@@ -197,7 +213,8 @@ contract TestTokenPaymaster is TestBase {
         testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
 
         vm.startPrank(PAYMASTER_OWNER.addr);
-        tokenPaymaster.setUnaccountedGas(70_000);
+        // Note: unaccounted gas for external mode is different as there is no call to the oracles.
+        tokenPaymaster.setUnaccountedGas(20_000);
         vm.stopPrank();
 
         // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
@@ -206,15 +223,15 @@ contract TestTokenPaymaster is TestBase {
         uint256 initialBundlerBalance = BUNDLER.addr.balance;
         uint256 initialPaymasterEpBalance = tokenPaymaster.getDeposit();
         uint256 initialUserTokenBalance = testToken.balanceOf(address(ALICE_ACCOUNT));
-        uint256 initialPaymasterTokenBalance = testToken.balanceOf(address(tokenPaymaster));
+        // uint256 initialPaymasterTokenBalance = testToken.balanceOf(address(tokenPaymaster));
         uint256 initialTokenFeeTreasuryBalance = testToken.balanceOf(PAYMASTER_FEE_COLLECTOR.addr);
 
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
 
-        uint48 validUntil = uint48(block.timestamp + 1 days);
-        uint48 validAfter = uint48(block.timestamp);
+        // uint48 validUntil = uint48(block.timestamp + 1 days);
+        // uint48 validAfter = uint48(block.timestamp);
         uint256 tokenPrice = 1e18; // Assume 1 token = 1 native token = 1 USD ?
-        uint32 externalFeeMarkup = 1.2e6; // no premium
+        uint32 externalFeeMarkup = 1.2e6; // premium
 
         // Good part of not doing pre-charge and only charging in postOp is we can give approval during the execution phase.
         // So we build a userOp with approve calldata.
@@ -249,10 +266,24 @@ contract TestTokenPaymaster is TestBase {
         uint256 gasCollectedInERC20ByFeeCollector =
             testToken.balanceOf(PAYMASTER_FEE_COLLECTOR.addr) - initialTokenFeeTreasuryBalance;
 
+        // // What user paid = received by paymaster fee collector
+        // unless ofcourse there is same token transfer in calldata
         assertEq(gasPaidBySAInERC20, gasCollectedInERC20ByFeeCollector);
 
-        // TODO:
         // calculateAndAssertAdjustmentsForTokenPaymaster...
+        uint256 totalGasFeePaid = BUNDLER.addr.balance - initialBundlerBalance;
+
+        // Assert that what paymaster paid is the same as what the bundler received
+        assertEq(totalGasFeePaid, initialPaymasterEpBalance - tokenPaymaster.getDeposit());
+
+        uint256 gasPaidBySAInNativeTokens = gasPaidBySAInERC20 * 1e18 / tokenPrice;
+
+        // Assert we never undercharge
+        assertGe(gasPaidBySAInNativeTokens, BUNDLER.addr.balance - initialBundlerBalance);
+
+        // Ensure that max 2% difference between total gas paid + the adjustment premium and gas paid by dapp (from
+        // paymaster)
+        assertApproxEqRel(totalGasFeePaid * externalFeeMarkup / 1e6, gasPaidBySAInNativeTokens, 0.02e18);
     }
 
     function test_Success_TokenPaymaster_IndependentMode_WithoutPremium() external {
@@ -261,7 +292,7 @@ contract TestTokenPaymaster is TestBase {
         testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
 
         vm.startPrank(PAYMASTER_OWNER.addr);
-        tokenPaymaster.setUnaccountedGas(70_000);
+        tokenPaymaster.setUnaccountedGas(40_000);
         vm.stopPrank();
 
         // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
@@ -270,7 +301,7 @@ contract TestTokenPaymaster is TestBase {
         uint256 initialBundlerBalance = BUNDLER.addr.balance;
         uint256 initialPaymasterEpBalance = tokenPaymaster.getDeposit();
         uint256 initialUserTokenBalance = testToken.balanceOf(address(ALICE_ACCOUNT));
-        uint256 initialPaymasterTokenBalance = testToken.balanceOf(address(tokenPaymaster));
+        // uint256 initialPaymasterTokenBalance = testToken.balanceOf(address(tokenPaymaster));
         uint256 initialTokenFeeTreasuryBalance = testToken.balanceOf(PAYMASTER_FEE_COLLECTOR.addr);
 
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
@@ -303,15 +334,32 @@ contract TestTokenPaymaster is TestBase {
         gasValue = gasValue - gasleft();
         stopPrank();
 
+        uint256 exchangeRate = tokenPaymaster.getExchangeRate(address(testToken));
+
         uint256 gasPaidBySAInERC20 = initialUserTokenBalance - testToken.balanceOf(address(ALICE_ACCOUNT));
 
         uint256 gasCollectedInERC20ByFeeCollector =
             testToken.balanceOf(PAYMASTER_FEE_COLLECTOR.addr) - initialTokenFeeTreasuryBalance;
 
+        // // What user paid = received by paymaster fee collector
+        // unless ofcourse there is same token transfer in calldata
         assertEq(gasPaidBySAInERC20, gasCollectedInERC20ByFeeCollector);
 
-        // TODO:
         // calculateAndAssertAdjustmentsForTokenPaymaster...
+        uint256 totalGasFeePaid = BUNDLER.addr.balance - initialBundlerBalance;
+
+        // Assert that what paymaster paid is the same as what the bundler received
+        assertEq(totalGasFeePaid, initialPaymasterEpBalance - tokenPaymaster.getDeposit());
+
+        uint256 gasPaidBySAInNativeTokens = gasPaidBySAInERC20 * 1e18 / exchangeRate;
+
+        // Assert we never undercharge
+        assertGe(gasPaidBySAInNativeTokens, BUNDLER.addr.balance - initialBundlerBalance);
+
+        // Since there is no premium, the paymaster should have received the same amount of tokens as it paid for
+        // Ensure that max 2% difference between total gas paid + the adjustment premium and gas paid by dapp (from
+        // paymaster)
+        assertApproxEqRel(totalGasFeePaid, gasPaidBySAInNativeTokens, 0.02e18);
     }
 
     function test_Success_TokenPaymaster_IndependentMode_WithPremium() external {
@@ -320,7 +368,7 @@ contract TestTokenPaymaster is TestBase {
         testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
 
         vm.startPrank(PAYMASTER_OWNER.addr);
-        tokenPaymaster.setUnaccountedGas(70_000);
+        tokenPaymaster.setUnaccountedGas(40_000);
         tokenPaymaster.updateTokenFeeMarkup(address(testToken), 1.2e6);
         vm.stopPrank();
 
@@ -330,7 +378,7 @@ contract TestTokenPaymaster is TestBase {
         uint256 initialBundlerBalance = BUNDLER.addr.balance;
         uint256 initialPaymasterEpBalance = tokenPaymaster.getDeposit();
         uint256 initialUserTokenBalance = testToken.balanceOf(address(ALICE_ACCOUNT));
-        uint256 initialPaymasterTokenBalance = testToken.balanceOf(address(tokenPaymaster));
+        // uint256 initialPaymasterTokenBalance = testToken.balanceOf(address(tokenPaymaster));
         uint256 initialTokenFeeTreasuryBalance = testToken.balanceOf(PAYMASTER_FEE_COLLECTOR.addr);
 
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
@@ -363,15 +411,34 @@ contract TestTokenPaymaster is TestBase {
         gasValue = gasValue - gasleft();
         stopPrank();
 
+        uint256 exchangeRate = tokenPaymaster.getExchangeRate(address(testToken));
+
         uint256 gasPaidBySAInERC20 = initialUserTokenBalance - testToken.balanceOf(address(ALICE_ACCOUNT));
 
         uint256 gasCollectedInERC20ByFeeCollector =
             testToken.balanceOf(PAYMASTER_FEE_COLLECTOR.addr) - initialTokenFeeTreasuryBalance;
 
+        // // What user paid = received by paymaster fee collector
+        // unless ofcourse there is same token transfer in calldata
         assertEq(gasPaidBySAInERC20, gasCollectedInERC20ByFeeCollector);
 
-        // TODO:
         // calculateAndAssertAdjustmentsForTokenPaymaster...
+        uint256 totalGasFeePaid = BUNDLER.addr.balance - initialBundlerBalance;
+
+        // Assert that what paymaster paid is the same as what the bundler received
+        assertEq(totalGasFeePaid, initialPaymasterEpBalance - tokenPaymaster.getDeposit());
+
+        uint256 gasPaidBySAInNativeTokens = gasPaidBySAInERC20 * 1e18 / exchangeRate;
+
+        uint256 gasCollectedInERC20ByFeeCollectorInNativeTokens =
+            gasCollectedInERC20ByFeeCollector * 1e18 / exchangeRate;
+
+        // Assert we never undercharge
+        assertGe(gasPaidBySAInNativeTokens, BUNDLER.addr.balance - initialBundlerBalance);
+
+        // Ensure that max 2% difference between total gas paid + the adjustment premium and gas paid by dapp (from
+        // paymaster)
+        assertApproxEqRel(totalGasFeePaid * 1.2e6 / 1e6, gasPaidBySAInNativeTokens, 0.02e18);
     }
 
     function test_Revert_PostOp_If_PriceExpired() external {
@@ -389,7 +456,7 @@ contract TestTokenPaymaster is TestBase {
         testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
 
         vm.startPrank(PAYMASTER_OWNER.addr);
-        tokenPaymaster.setUnaccountedGas(70_000);
+        tokenPaymaster.setUnaccountedGas(40_000);
         vm.stopPrank();
 
         // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
@@ -441,7 +508,7 @@ contract TestTokenPaymaster is TestBase {
         testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
 
         vm.startPrank(PAYMASTER_OWNER.addr);
-        tokenPaymaster.setUnaccountedGas(70_000);
+        tokenPaymaster.setUnaccountedGas(40_000);
         vm.stopPrank();
 
         // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
@@ -485,7 +552,7 @@ contract TestTokenPaymaster is TestBase {
         invalidToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
 
         vm.startPrank(PAYMASTER_OWNER.addr);
-        tokenPaymaster.setUnaccountedGas(70_000);
+        tokenPaymaster.setUnaccountedGas(40_000);
         vm.stopPrank();
 
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
@@ -529,7 +596,7 @@ contract TestTokenPaymaster is TestBase {
         // This would be a problem in postOp.
 
         vm.startPrank(PAYMASTER_OWNER.addr);
-        tokenPaymaster.setUnaccountedGas(70_000);
+        tokenPaymaster.setUnaccountedGas(40_000);
         vm.stopPrank();
 
         // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
@@ -585,7 +652,7 @@ contract TestTokenPaymaster is TestBase {
         testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
 
         vm.startPrank(PAYMASTER_OWNER.addr);
-        tokenPaymaster.setUnaccountedGas(70_000);
+        tokenPaymaster.setUnaccountedGas(40_000);
         vm.stopPrank();
 
         // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
@@ -728,7 +795,7 @@ contract TestTokenPaymaster is TestBase {
         testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
 
         vm.startPrank(PAYMASTER_OWNER.addr);
-        tokenPaymaster.setUnaccountedGas(70_000);
+        tokenPaymaster.setUnaccountedGas(40_000);
         vm.stopPrank();
 
         // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
