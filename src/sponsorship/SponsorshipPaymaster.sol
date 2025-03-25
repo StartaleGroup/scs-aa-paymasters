@@ -11,7 +11,7 @@ import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ISponsorshipPaymaster} from "../interfaces/ISponsorshipPaymaster.sol";
-import {MultiSigners} from "./MultiSigners.sol";
+import {MultiSigners} from "../lib/MultiSigners.sol";
 
 contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTransient, ISponsorshipPaymaster {
     using UserOperationLib for PackedUserOperation;

@@ -6,7 +6,7 @@ import {ISponsorshipPaymaster} from "../../../../src/interfaces/ISponsorshipPaym
 import {SponsorshipPaymaster} from "../../../../src/sponsorship/SponsorshipPaymaster.sol";
 import {ISponsorshipPaymasterEventsAndErrors} from "../../../../src/interfaces/ISponsorshipPaymasterEventsAndErrors.sol";
 import "@account-abstraction/contracts/interfaces/IStakeManager.sol";
-import {MultiSigners} from "../../../../src/sponsorship/MultiSigners.sol";
+import {MultiSigners} from "../../../../src/lib/MultiSigners.sol";
 import {TestCounter} from "../../TestCounter.sol";
 import {MockToken} from "../../mock/MockToken.sol";
 
@@ -567,7 +567,7 @@ contract TestSponsorshipPaymaster is TestBase {
 
         sponsorshipPaymaster.depositFor{value: 10 ether}(SPONSOR_ACCOUNT.addr);
         startPrank(PAYMASTER_OWNER.addr);
-        sponsorshipPaymaster.setUnaccountedGas(11_000);
+        sponsorshipPaymaster.setUnaccountedGas(15_000);
         stopPrank();
 
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
