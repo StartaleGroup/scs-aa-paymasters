@@ -20,7 +20,8 @@ import {TokenPaymasterParserLib} from "../../lib/TokenPaymasterParserLib.sol";
 /**
  * @title StartaleTokenPaymaster
  * @author Startale
- * @notice ERC20 Token Paymaster for Startale that supports multiple tokens.
+ * @notice ERC20 Token Paymaster for Startale that supports multiple tokens
+ * @dev Handles payment for account abstraction operations using ERC20 tokens
  */
 contract StartaleTokenPaymaster is
     BasePaymaster,
@@ -34,24 +35,41 @@ contract StartaleTokenPaymaster is
     using ECDSA_solady for bytes32;
     using TokenPaymasterParserLib for bytes;
 
-    // Denominator to prevent precision errors when applying fee markup
+    // Constants
+    /// @dev Denominator to prevent precision errors when applying fee markup
     uint256 private constant FEE_MARKUP_DENOMINATOR = 1e6;
 
+    /// @dev Maximum allowed fee markup
     uint256 private constant MAX_FEE_MARKUP = 2e6;
 
-    // Limit for unaccounted gas cost
+    /// @dev Limit for unaccounted gas cost
     uint256 private constant UNACCOUNTED_GAS_LIMIT = 150_000;
 
-    // Fee collector address
+    // State variables
+    /// @notice Address where token fees are collected
     address public tokenFeesTreasury;
 
-    // Note: Type may be updated to pack efficiently.
+    /// @notice Gas amount not accounted for in calculations
     uint256 public unaccountedGas;
 
-    /// @notice This is a mapping for independent tokens to their activated state and fee markup.
-    /// The actual information on token oracle config is stored in the parent contract(OracleHelper) in a different mapping.
+    /// @notice Mapping for independent tokens to their activated state and fee markup
+    /// @dev The actual information on token oracle config is stored in the parent contract(OracleHelper) in a different mapping
     mapping(address => TokenConfig) private tokenConfigs;
 
+    /**
+     * @notice Initializes the token paymaster contract
+     * @param _owner Owner address for the paymaster
+     * @param _entryPoint EntryPoint contract address
+     * @param _signers Array of initial signer addresses
+     * @param _tokenFeesTreasury Address where token fees will be collected
+     * @param _unaccountedGas Gas amount not accounted for in calculations
+     * @param _nativeAssetToUsdOracle Oracle for native asset to USD price
+     * @param _nativeAssetMaxOracleRoundAge Maximum age for native asset oracle data
+     * @param _nativeAssetDecimals Decimals of the native asset
+     * @param _independentTokens Array of supported token addresses
+     * @param _feeMarkupsForIndependentTokens Array of fee markups for supported tokens
+     * @param _tokenOracleConfigs Array of oracle configs for supported tokens
+     */
     constructor(
         address _owner,
         address _entryPoint,
@@ -84,7 +102,9 @@ contract StartaleTokenPaymaster is
             revert ArrayLengthMismatch();
         }
 
-        if (_tokenFeesTreasury == address(0)) revert InvalidTokenFeesTreasury();
+        if (_tokenFeesTreasury == address(0)) {
+            revert InvalidTokenFeesTreasury();
+        }
         tokenFeesTreasury = _tokenFeesTreasury;
 
         if (_unaccountedGas > UNACCOUNTED_GAS_LIMIT) {
@@ -97,109 +117,299 @@ contract StartaleTokenPaymaster is
         }
     }
 
+    // No receive/fallback functions in this contract
+
+    // External non-view functions
+
     /**
-     * @dev Allows the owner to set the extra gas used in post-op calculations.
-     * @notice Ensures the value does not exceed `UNACCOUNTED_GAS_LIMIT`.
-     * @param value The new unaccounted gas value.
+     * @notice Sets the unaccounted gas used in post-op calculations
+     * @dev Ensures the value does not exceed `UNACCOUNTED_GAS_LIMIT`
+     * @param _value The new unaccounted gas value
      */
-    function setUnaccountedGas(uint256 value) external payable onlyOwner {
-        if (value > UNACCOUNTED_GAS_LIMIT) {
+    function setUnaccountedGas(uint256 _value) external payable onlyOwner {
+        if (_value > UNACCOUNTED_GAS_LIMIT) {
             revert UnaccountedGasTooHigh();
         }
-        unaccountedGas = value;
+        unaccountedGas = _value;
     }
 
     /**
-     * @dev Sets the token fees treasury address.
-     * @param _tokenFeesTreasury The address of the token fees treasury.
+     * @notice Sets the token fees treasury address
+     * @param _tokenFeesTreasury The address of the token fees treasury
      */
     function setTokenFeesTreasury(address _tokenFeesTreasury) external payable onlyOwner {
-        // @dev We can add a check here to ensure the treasury is a valid address.
-        // @notice It is allowed to be a contract.
-        if (_tokenFeesTreasury == address(0)) revert InvalidTokenFeesTreasury();
+        if (_tokenFeesTreasury == address(0)) {
+            revert InvalidTokenFeesTreasury();
+        }
         tokenFeesTreasury = _tokenFeesTreasury;
     }
 
     /**
-     * @dev pull tokens out of paymaster in case they were sent to the paymaster at any point.
-     * @dev This could happen if someone accidently sends ERC20 to paymaster address and we need to recover them.
-     * @notice tokenFeeTreasury could also be set to paymaster address address itself. In case of manual withdraw to recharge we would use this method
-     * @notice we could also add withdrawMultipleERC20() method to batch withdraw several tokens.
-     * @param token the token deposit to withdraw
-     * @param target address to send to
-     * @param amount amount to withdraw
+     * @notice Withdraw tokens from paymaster in case they were sent to the paymaster
+     * @dev Can be used to recover accidentally sent tokens or for manual withdrawals
+     * @param _token The token to withdraw
+     * @param _target Address to send tokens to
+     * @param _amount Amount to withdraw
      */
-    function withdrawERC20(IERC20 token, address target, uint256 amount) external onlyOwner nonReentrant {
-        _withdrawERC20(token, target, amount);
+    function withdrawERC20(IERC20 _token, address _target, uint256 _amount) external onlyOwner nonReentrant {
+        _withdrawERC20(_token, _target, _amount);
     }
 
     /**
-     * @dev Internal function to withdraw ERC20 tokens.
-     * @param token The token to withdraw.
-     * @param target The address to send the tokens to.
-     * @param amount The amount of tokens to withdraw.
+     * @notice Withdraws ETH from the paymaster
+     * @param _recipient The address to send the ETH to
+     * @param _amount The amount of ETH to withdraw
      */
-    function _withdrawERC20(IERC20 token, address target, uint256 amount) private {
-        if (target == address(0)) revert InvalidWithdrawalAddress();
-        SafeTransferLib.safeTransfer(address(token), target, amount);
-        emit TokensWithdrawn(address(token), target, msg.sender, amount);
-    }
-
-    /**
-     * @dev Withdraws ETH from the paymaster.
-     * @param recipient The address to send the ETH to.
-     * @param amount The amount of ETH to withdraw.
-     */
-    function withdrawEth(address payable recipient, uint256 amount) external payable onlyOwner nonReentrant {
-        (bool success,) = recipient.call{value: amount}("");
+    function withdrawEth(address payable _recipient, uint256 _amount) external payable onlyOwner nonReentrant {
+        (bool success,) = _recipient.call{value: _amount}("");
         if (!success) {
             revert WithdrawalFailed();
         }
-        emit EthWithdrawn(recipient, amount);
+        emit EthWithdrawn(_recipient, _amount);
     }
 
     /**
-     * @dev Adds a new signer to the list of authorized signers.
-     * @param _signer The address of the signer to add.
+     * @notice Adds a new signer to the list of authorized signers
+     * @param _signer The address of the signer to add
      */
     function addSigner(address _signer) external payable onlyOwner {
         _addSigner(_signer);
     }
 
     /**
-     * @dev Removes a signer from the list of authorized signers.
-     * @param _signer The address of the signer to remove.
+     * @notice Removes a signer from the list of authorized signers
+     * @param _signer The address of the signer to remove
      */
     function removeSigner(address _signer) external payable onlyOwner {
         _removeSigner(_signer);
     }
 
     /**
-     * @dev Validates the UserOperation and deducts the required gas sponsorship amount.
-     * @param _userOp The UserOperation being validated.
-     * @param _userOpHash The hash of the UserOperation.
-     * @param requiredPreFund The required ETH for the UserOperation.
-     * @return Encoded context for post-operation handling and validationData for EntryPoint.
+     * @notice Adds a new supported token with its configuration
+     * @param _token The token address
+     * @param _feeMarkup The fee markup for the token
+     * @param _oracleConfig The oracle configuration for the token
+     */
+    function addSupportedToken(
+        address _token,
+        uint48 _feeMarkup,
+        IOracleHelper.TokenOracleConfig calldata _oracleConfig
+    ) external onlyOwner {
+        _addSupportedToken(_token, _feeMarkup, _oracleConfig);
+    }
+
+    /**
+     * @notice Removes a supported token
+     * @param _token The token address to remove
+     */
+    function removeSupportedToken(address _token) external onlyOwner {
+        if (!tokenConfigs[_token].isEnabled) {
+            revert TokenNotSupported(_token);
+        }
+
+        delete tokenConfigs[_token];
+        delete tokenOracleConfigurations[_token];
+        emit TokenRemoved(_token);
+    }
+
+    /**
+     * @notice Updates the oracle configuration for a specific token
+     * @param _token The token address
+     * @param _newOracleConfig The new oracle configuration
+     */
+    function updateTokenOracleConfig(address _token, IOracleHelper.TokenOracleConfig calldata _newOracleConfig)
+        external
+        onlyOwner
+    {
+        if (!tokenConfigs[_token].isEnabled) {
+            revert TokenNotSupported(_token);
+        }
+
+        _updateTokenOracleConfig(_token, _newOracleConfig);
+    }
+
+    /**
+     * @notice Updates the native oracle configuration
+     * @param _newNativeOracleConfig The new oracle configuration
+     */
+    function updateNativeOracleConfig(IOracleHelper.NativeOracleConfig calldata _newNativeOracleConfig)
+        external
+        onlyOwner
+    {
+        _updateNativeOracleConfig(_newNativeOracleConfig);
+    }
+
+    /**
+     * @notice Updates the fee markup for a specific token
+     * @param _token The token address to update
+     * @param _newFeeMarkup The new fee markup value
+     */
+    function updateTokenFeeMarkup(address _token, uint48 _newFeeMarkup) external onlyOwner {
+        if (!tokenConfigs[_token].isEnabled) {
+            revert TokenNotSupported(_token);
+        }
+        if (_newFeeMarkup > MAX_FEE_MARKUP) {
+            revert FeeMarkupTooHigh();
+        }
+
+        tokenConfigs[_token].feeMarkup = _newFeeMarkup;
+        emit TokenFeeMarkupUpdated(_token, _newFeeMarkup);
+    }
+
+    // External view/pure functions
+
+    /**
+     * @notice Generates a hash of the given UserOperation to be signed by the paymaster
+     * @param _userOp The UserOperation structure
+     * @param _validUntil The timestamp until which the UserOperation is valid
+     * @param _validAfter The timestamp after which the UserOperation is valid
+     * @param _tokenAddress The address of the token to be used for the UserOperation
+     * @param _exchangeRate The exchange rate of the token
+     * @param _appliedFeeMarkup The fee markup for the UserOperation
+     * @return The hashed UserOperation data
+     */
+    function getHashForExternalMode(
+        PackedUserOperation calldata _userOp,
+        uint48 _validUntil,
+        uint48 _validAfter,
+        address _tokenAddress,
+        uint256 _exchangeRate,
+        uint48 _appliedFeeMarkup
+    ) public view returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                _userOp.getSender(),
+                _userOp.nonce,
+                keccak256(_userOp.initCode),
+                keccak256(_userOp.callData),
+                _userOp.accountGasLimits,
+                uint256(bytes32(_userOp.paymasterAndData[PAYMASTER_VALIDATION_GAS_OFFSET:PAYMASTER_DATA_OFFSET])),
+                _userOp.preVerificationGas,
+                _userOp.gasFees,
+                block.chainid,
+                address(this),
+                _validUntil,
+                _validAfter,
+                _tokenAddress,
+                _exchangeRate,
+                _appliedFeeMarkup
+            )
+        );
+    }
+
+    /**
+     * @notice Checks if a token is supported and enabled
+     * @param _token The token address to check
+     * @return bool True if token is supported and enabled
+     */
+    function isTokenSupported(address _token) public view returns (bool) {
+        return tokenConfigs[_token].isEnabled;
+    }
+
+    /**
+     * @notice Gets the fee markup for a specific token
+     * @param _token The token address
+     * @return uint48 The fee markup value
+     */
+    function getTokenFeeMarkup(address _token) public view returns (uint48) {
+        return tokenConfigs[_token].feeMarkup;
+    }
+
+    // No public non-view functions in this contract
+
+    // No public view/pure functions in this contract (other than those inherited)
+
+    // Internal non-view functions
+
+    /**
+     * @notice Handles the post-operation logic after transaction execution
+     * @dev Adjusts gas costs, refunds excess gas, and ensures sufficient paymaster balance
+     * @param _mode The post-operation mode
+     * @param _context Encoded context passed from `_validatePaymasterUserOp`
+     * @param _actualGasCost The actual gas cost incurred
+     * @param _actualUserOpFeePerGas The effective gas price used for calculation
+     */
+    function _postOp(PostOpMode _mode, bytes calldata _context, uint256 _actualGasCost, uint256 _actualUserOpFeePerGas)
+        internal
+        override
+    {
+        (_mode); // Unused parameter
+
+        (
+            address sender,
+            address tokenAddress,
+            uint256 preOpGasApproximation,
+            uint256 executionGasLimit,
+            uint256 exchangeRate,
+            uint48 appliedFeeMarkup
+        ) = abi.decode(_context, (address, address, uint256, uint256, uint256, uint48));
+
+        uint256 actualGas = _actualGasCost / _actualUserOpFeePerGas;
+
+        // If exchangeRate is 0, it means it was not set in the validatePaymasterUserOp => independent mode
+        // So we need to get the price of the token from the oracle now
+        if (exchangeRate == 0) {
+            exchangeRate = getExchangeRate(tokenAddress);
+            // if exchangeRate is still 0, it means the token is not supported or something went wrong
+            if (exchangeRate == 0) {
+                revert TokenPriceFeedErrored(tokenAddress);
+            }
+        }
+
+        uint256 executionGasUsed;
+        if (actualGas + unaccountedGas > preOpGasApproximation) {
+            executionGasUsed = actualGas + unaccountedGas - preOpGasApproximation;
+        }
+
+        uint256 expectedPenaltyGas;
+        if (executionGasLimit > executionGasUsed) {
+            expectedPenaltyGas = (executionGasLimit - executionGasUsed) * 10 / 100;
+        }
+
+        // Include unaccountedGas since EP doesn't include this in actualGasCost
+        // unaccountedGas = postOpGas + EP overhead gas
+        uint256 adjustedGasCost = _actualGasCost + ((unaccountedGas + expectedPenaltyGas) * _actualUserOpFeePerGas);
+        adjustedGasCost = (adjustedGasCost * appliedFeeMarkup) / FEE_MARKUP_DENOMINATOR;
+
+        // There is no preCharged amount so we can go ahead and transfer the token now
+        uint256 tokenAmount = (adjustedGasCost * exchangeRate) / (10 ** nativeOracleConfig.nativeAssetDecimals);
+
+        if (SafeTransferLib.trySafeTransferFrom(tokenAddress, sender, tokenFeesTreasury, tokenAmount)) {
+            emit PaidGasInTokens(sender, tokenAddress, tokenAmount, appliedFeeMarkup, exchangeRate);
+        } else {
+            revert FailedToChargeTokens(sender, tokenAddress, tokenAmount);
+        }
+    }
+
+    // Internal view/pure functions
+
+    /**
+     * @notice Validates the UserOperation and deducts the required gas sponsorship amount
+     * @param _userOp The UserOperation being validated
+     * @param _userOpHash The hash of the UserOperation
+     * @param _requiredPreFund The required ETH for the UserOperation
+     * @return Encoded context for post-operation handling and validationData for EntryPoint
      */
     function _validatePaymasterUserOp(
         PackedUserOperation calldata _userOp,
         bytes32 _userOpHash,
-        uint256 requiredPreFund
+        uint256 _requiredPreFund
     ) internal view override returns (bytes memory, uint256) {
-        (_userOpHash, requiredPreFund);
+        (_userOpHash, _requiredPreFund); // Unused parameters
+
         (PaymasterMode mode, bytes calldata modeSpecificData) = _userOp.paymasterAndData.parsePaymasterAndData();
 
-        // @dev We only have two modes for now. Change this if we add more modes.
+        // We only have two modes for now. Change this if we add more modes
         if (uint8(mode) > 1) {
             revert InvalidPaymasterMode();
         }
 
-        // @dev We need to ensure the postOp gas limit is not too low.
+        // Ensure the postOp gas limit is not too low
         if (unaccountedGas > _userOp.unpackPostOpGasLimit()) {
             revert PostOpGasLimitTooLow();
         }
 
-        // Save some state to help calculate the expected penalty during postOp
+        // Save state to help calculate the expected penalty during postOp
         uint256 preOpGasApproximation = _userOp.preVerificationGas + _userOp.unpackVerificationGasLimit()
             + _userOp.unpackPaymasterVerificationGasLimit();
 
@@ -207,32 +417,25 @@ contract StartaleTokenPaymaster is
 
         if (mode == PaymasterMode.INDEPENDENT) {
             (address tokenAddress) = modeSpecificData.parseIndependentModeSpecificData();
-            // Check length it must be 20 bytes.
+            // Check length - it must be 20 bytes
             if (modeSpecificData.length != 20) {
                 revert InvalidIndependentModeSpecificData();
             }
 
-            // Check if token is supported.
+            // Check if token is supported
             if (!isTokenSupported(tokenAddress)) {
                 revert TokenNotSupported(tokenAddress);
             }
 
-            // @dev Implementation below for validateIndependentMode() -> context, validationData
             uint48 feeMarkup = getTokenFeeMarkup(tokenAddress);
 
-            /// @notice If we want to check balance here, we need to uncomment gasPenalty from above.
-            /// @notice We only need to calculate exchange rate if we are checking balance here.
-            /// @notice In that case we would calculate max cost in token terms using above exchange rate.
-            /// @notice Then we would check if sender has enough balance.
-            /// @notice We avoid transferFrom here. So there is no precharge.
-
-            // prepare appropriate context.
+            // Prepare context for postOp
             bytes memory context = abi.encode(
                 _userOp.sender,
                 tokenAddress,
                 preOpGasApproximation,
                 executionGasLimit,
-                uint256(0), // exchangeRate. zero in case we solely rely on postOp to call oracle
+                uint256(0), // exchangeRate is zero in independent mode
                 feeMarkup
             );
             uint256 validationData = _packValidationData(false, 0, 0);
@@ -247,14 +450,12 @@ contract StartaleTokenPaymaster is
                 bytes calldata signature
             ) = modeSpecificData.parseExternalModeSpecificData();
 
-            // @dev Implementation below for validateExternalMode() -> context, validationData
-
-            // Validate Sig Length
+            // Validate signature length
             if (signature.length != 64 && signature.length != 65) {
                 revert PaymasterSignatureLengthInvalid();
             }
 
-            // Validate supplied markup is not greater than max markup.
+            // Validate supplied markup is not greater than max markup
             if (appliedFeeMarkup > MAX_FEE_MARKUP) {
                 revert FeeMarkupTooHigh();
             }
@@ -276,217 +477,57 @@ contract StartaleTokenPaymaster is
                 return ("", validationData);
             }
 
-            /// @notice If we want to check balance here, we need to uncomment gasPenalty from above.
-            /// @notice We only need to use supplied exchange rate if we are checking balance here.
-            /// @notice In that case we would calculate max cost in token terms using above exchange rate.
-            /// @notice Then we would check if sender has enough balance.
-            /// @notice We avoid transferFrom here. So there is no precharge.
-
-            // prepare appropriate context.
+            // Prepare context for postOp
             bytes memory context = abi.encode(
                 _userOp.sender, tokenAddress, preOpGasApproximation, executionGasLimit, exchangeRate, appliedFeeMarkup
             );
             return (context, validationData);
         }
+
+        // This should never be reached due to the mode check above
+        revert InvalidPaymasterMode();
+    }
+
+    // Private non-view functions
+
+    /**
+     * @notice Internal function to withdraw ERC20 tokens
+     * @param _token The token to withdraw
+     * @param _target The address to send the tokens to
+     * @param _amount The amount of tokens to withdraw
+     */
+    function _withdrawERC20(IERC20 _token, address _target, uint256 _amount) private {
+        if (_target == address(0)) {
+            revert InvalidWithdrawalAddress();
+        }
+        SafeTransferLib.safeTransfer(address(_token), _target, _amount);
+        emit TokensWithdrawn(address(_token), _target, msg.sender, _amount);
     }
 
     /**
-     * @dev Generates a hash of the given UserOperation to be signed by the paymaster.
-     * @param userOp The UserOperation structure.
-     * @param validUntil The timestamp until which the UserOperation is valid.
-     * @param validAfter The timestamp after which the UserOperation is valid.
-     * @param tokenAddress The address of the token to be used for the UserOperation.
-     * @param exchangeRate The exchange rate of the token.
-     * @param appliedFeeMarkup The fee markup for the UserOperation.
-     * @return The hashed UserOperation data.
+     * @notice Internal function to add a supported token
+     * @param _token The token address
+     * @param _feeMarkup The fee markup for the token
+     * @param _oracleConfig The oracle configuration for the token
      */
-    function getHashForExternalMode(
-        PackedUserOperation calldata userOp,
-        uint48 validUntil,
-        uint48 validAfter,
-        address tokenAddress,
-        uint256 exchangeRate,
-        uint48 appliedFeeMarkup
-    ) public view returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                userOp.getSender(),
-                userOp.nonce,
-                keccak256(userOp.initCode),
-                keccak256(userOp.callData),
-                userOp.accountGasLimits,
-                uint256(bytes32(userOp.paymasterAndData[PAYMASTER_VALIDATION_GAS_OFFSET:PAYMASTER_DATA_OFFSET])),
-                userOp.preVerificationGas,
-                userOp.gasFees,
-                block.chainid,
-                address(this),
-                validUntil,
-                validAfter,
-                tokenAddress,
-                exchangeRate,
-                appliedFeeMarkup
-            )
-        );
-    }
-
-    /**
-     * @dev Handles the post-operation logic after transaction execution.
-     * @notice Adjusts gas costs, refunds excess gas, and ensures sufficient paymaster balance.
-     * @param context Encoded context passed from `_validatePaymasterUserOp`.
-     * @param actualGasCost The actual gas cost incurred.
-     * @param actualUserOpFeePerGas The effective gas price used for calculation.
-     */
-    function _postOp(PostOpMode, bytes calldata context, uint256 actualGasCost, uint256 actualUserOpFeePerGas)
-        internal
-        override
-    {
-        // @dev implementation below for parseContext() below
-        (
-            address sender,
-            address tokenAddress,
-            uint256 preOpGasApproximation,
-            uint256 executionGasLimit,
-            uint256 exchangeRate,
-            uint48 appliedFeeMarkup
-        ) = abi.decode(context, (address, address, uint256, uint256, uint256, uint48));
-        uint256 actualGas = actualGasCost / actualUserOpFeePerGas;
-
-        // If exchangeRate is 0, it means it was not set in the validatePaymasterUserOp => independent mode
-        // So we need to get the price of the token from the oracle now
-        if (exchangeRate == 0) {
-            /// @notice try/catch only works for external calls.
-            // If we want to throw custom error TokenPriceFeedErrored then we have to make staticcall via assembly and throw based on failiure.
-            exchangeRate = getExchangeRate(tokenAddress);
-            // if exchangeRate is still 0, it means the token is not supported or something went wrong.
-            if (exchangeRate == 0) {
-                revert TokenPriceFeedErrored(tokenAddress);
-            }
-        }
-
-        uint256 executionGasUsed;
-        if (actualGas + unaccountedGas > preOpGasApproximation) {
-            executionGasUsed = actualGas + unaccountedGas - preOpGasApproximation;
-        }
-
-        uint256 expectedPenaltyGas;
-        if (executionGasLimit > executionGasUsed) {
-            expectedPenaltyGas = (executionGasLimit - executionGasUsed) * 10 / 100;
-        }
-
-        // Include unaccountedGas since EP doesn't include this in actualGasCost
-        // unaccountedGas = postOpGas + EP overhead gas
-        actualGasCost = actualGasCost + ((unaccountedGas + expectedPenaltyGas) * actualUserOpFeePerGas);
-
-        uint256 adjustedGasCost = (actualGasCost * appliedFeeMarkup) / FEE_MARKUP_DENOMINATOR;
-
-        // There is no preCharged amount so we can go ahead and transfer the token now.
-        uint256 tokenAmount = (adjustedGasCost * exchangeRate) / (10 ** nativeOracleConfig.nativeAssetDecimals);
-
-        if (SafeTransferLib.trySafeTransferFrom(tokenAddress, sender, tokenFeesTreasury, tokenAmount)) {
-            emit PaidGasInTokens(sender, tokenAddress, tokenAmount, appliedFeeMarkup, exchangeRate);
-        } else {
-            revert FailedToChargeTokens(sender, tokenAddress, tokenAmount);
-        }
-    }
-
-    /**
-     * @dev Adds a new supported token with its configuration
-     * @param token The token address
-     * @param feeMarkup The fee markup for the token
-     * @param oracleConfig The oracle configuration for the token
-     */
-    function addSupportedToken(address token, uint48 feeMarkup, IOracleHelper.TokenOracleConfig calldata oracleConfig)
-        external
-        onlyOwner
-    {
-        _addSupportedToken(token, feeMarkup, oracleConfig);
-    }
-
-    /**
-     * @dev Internal function to add a supported token
-     * @param token The token address
-     * @param feeMarkup The fee markup for the token
-     * @param oracleConfig The oracle configuration for the token
-     */
-    function _addSupportedToken(address token, uint48 feeMarkup, IOracleHelper.TokenOracleConfig memory oracleConfig)
+    function _addSupportedToken(address _token, uint48 _feeMarkup, IOracleHelper.TokenOracleConfig memory _oracleConfig)
         private
     {
-        if (token == address(0)) revert InvalidTokenAddress();
-        ///@notice We can add a check here to ensure the fee markup is not too low.
-        if (feeMarkup > MAX_FEE_MARKUP) revert FeeMarkupTooHigh();
-        if (tokenConfigs[token].isEnabled) revert TokenAlreadySupported();
+        if (_token == address(0)) {
+            revert InvalidTokenAddress();
+        }
+        if (_feeMarkup > MAX_FEE_MARKUP) {
+            revert FeeMarkupTooHigh();
+        }
+        if (tokenConfigs[_token].isEnabled) {
+            revert TokenAlreadySupported();
+        }
 
-        tokenConfigs[token] = TokenConfig({feeMarkup: feeMarkup, isEnabled: true});
+        tokenConfigs[_token] = TokenConfig({feeMarkup: _feeMarkup, isEnabled: true});
 
-        _updateTokenOracleConfig(token, oracleConfig);
-        emit TokenAdded(token, feeMarkup, oracleConfig);
+        _updateTokenOracleConfig(_token, _oracleConfig);
+        emit TokenAdded(_token, _feeMarkup, _oracleConfig);
     }
 
-    /**
-     * @dev Removes a supported token
-     * @param token The token address to remove
-     */
-    function removeSupportedToken(address token) external onlyOwner {
-        if (!tokenConfigs[token].isEnabled) revert TokenNotSupported(token);
-
-        delete tokenConfigs[token];
-        delete tokenOracleConfigurations[token];
-        emit TokenRemoved(token);
-    }
-
-    /**
-     * @dev Updates the oracle configuration for a specific token
-     * @param token The token address
-     * @param newOracleConfig The new oracle configuration
-     */
-    function updateTokenOracleConfig(address token, IOracleHelper.TokenOracleConfig calldata newOracleConfig)
-        external
-        onlyOwner
-    {
-        if (!tokenConfigs[token].isEnabled) revert TokenNotSupported(token);
-
-        _updateTokenOracleConfig(token, newOracleConfig);
-    }
-
-    /**
-     * @dev Updates the native oracle configuration
-     * @param newNativeOracleConfig The new oracle configuration
-     */
-    function updateNativeOracleConfig(IOracleHelper.NativeOracleConfig calldata newNativeOracleConfig)
-        external
-        onlyOwner
-    {
-        _updateNativeOracleConfig(newNativeOracleConfig);
-    }
-
-    /**
-     * @dev Updates the fee markup for a specific token
-     * @param token The token address to update
-     * @param newFeeMarkup The new fee markup value
-     */
-    function updateTokenFeeMarkup(address token, uint48 newFeeMarkup) external onlyOwner {
-        if (!tokenConfigs[token].isEnabled) revert TokenNotSupported(token);
-        if (newFeeMarkup > MAX_FEE_MARKUP) revert FeeMarkupTooHigh();
-
-        tokenConfigs[token].feeMarkup = newFeeMarkup;
-        emit TokenFeeMarkupUpdated(token, newFeeMarkup);
-    }
-
-    /**
-     * @dev Checks if a token is supported and enabled
-     * @param token The token address to check
-     * @return bool True if token is supported and enabled
-     */
-    function isTokenSupported(address token) public view returns (bool) {
-        return tokenConfigs[token].isEnabled;
-    }
-
-    /**
-     * @dev Gets the fee markup for a specific token
-     * @param token The token address
-     * @return uint48 The fee markup value
-     */
-    function getTokenFeeMarkup(address token) public view returns (uint48) {
-        return tokenConfigs[token].feeMarkup;
-    }
+    // No private view/pure functions in this contract
 }
