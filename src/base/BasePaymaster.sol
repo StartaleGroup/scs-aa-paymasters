@@ -20,10 +20,10 @@ abstract contract BasePaymaster is IPaymaster, SoladyOwnable {
     // Constants
     /// @dev Offset to paymaster validation gas in the UserOperation
     uint256 internal constant PAYMASTER_VALIDATION_GAS_OFFSET = UserOperationLib.PAYMASTER_VALIDATION_GAS_OFFSET;
-    
+
     /// @dev Offset to paymaster post-op gas in the UserOperation
     uint256 internal constant PAYMASTER_POSTOP_GAS_OFFSET = UserOperationLib.PAYMASTER_POSTOP_GAS_OFFSET;
-    
+
     /// @dev Offset to paymaster data in the UserOperation
     uint256 internal constant PAYMASTER_DATA_OFFSET = UserOperationLib.PAYMASTER_DATA_OFFSET;
 
@@ -48,11 +48,11 @@ abstract contract BasePaymaster is IPaymaster, SoladyOwnable {
      * @return context Context for post-operation handling
      * @return validationData Packed validation data for the EntryPoint
      */
-    function validatePaymasterUserOp(
-        PackedUserOperation calldata userOp, 
-        bytes32 userOpHash, 
-        uint256 maxCost
-    ) external override returns (bytes memory context, uint256 validationData) {
+    function validatePaymasterUserOp(PackedUserOperation calldata userOp, bytes32 userOpHash, uint256 maxCost)
+        external
+        override
+        returns (bytes memory context, uint256 validationData)
+    {
         _requireFromEntryPoint();
         return _validatePaymasterUserOp(userOp, userOpHash, maxCost);
     }
@@ -65,12 +65,10 @@ abstract contract BasePaymaster is IPaymaster, SoladyOwnable {
      * @param actualGasCost Actual gas cost of the operation
      * @param actualUserOpFeePerGas The gas price this operation pays
      */
-    function postOp(
-        PostOpMode mode, 
-        bytes calldata context, 
-        uint256 actualGasCost, 
-        uint256 actualUserOpFeePerGas
-    ) external override {
+    function postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost, uint256 actualUserOpFeePerGas)
+        external
+        override
+    {
         _requireFromEntryPoint();
         _postOp(mode, context, actualGasCost, actualUserOpFeePerGas);
     }
@@ -141,11 +139,10 @@ abstract contract BasePaymaster is IPaymaster, SoladyOwnable {
      * @return context Context for post-operation handling
      * @return validationData Packed validation data for the EntryPoint
      */
-    function _validatePaymasterUserOp(
-        PackedUserOperation calldata _userOp, 
-        bytes32 _userOpHash, 
-        uint256 _maxCost
-    ) internal virtual returns (bytes memory context, uint256 validationData);
+    function _validatePaymasterUserOp(PackedUserOperation calldata _userOp, bytes32 _userOpHash, uint256 _maxCost)
+        internal
+        virtual
+        returns (bytes memory context, uint256 validationData);
 
     /**
      * @notice Post-operation handler
@@ -155,12 +152,10 @@ abstract contract BasePaymaster is IPaymaster, SoladyOwnable {
      * @param _actualGasCost Actual gas cost of the operation
      * @param _actualUserOpFeePerGas The gas price this operation pays
      */
-    function _postOp(
-        PostOpMode _mode, 
-        bytes calldata _context, 
-        uint256 _actualGasCost, 
-        uint256 _actualUserOpFeePerGas
-    ) internal virtual {
+    function _postOp(PostOpMode _mode, bytes calldata _context, uint256 _actualGasCost, uint256 _actualUserOpFeePerGas)
+        internal
+        virtual
+    {
         (_mode, _context, _actualGasCost, _actualUserOpFeePerGas); // unused params
         revert("BasePaymaster: _postOp must be overridden");
     }

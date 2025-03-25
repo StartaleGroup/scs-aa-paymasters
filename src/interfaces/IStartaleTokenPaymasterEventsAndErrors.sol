@@ -11,7 +11,7 @@ import {IOracleHelper} from "./IOracleHelper.sol";
  */
 interface IStartaleTokenPaymasterEventsAndErrors {
     // Events
-    
+
     /**
      * @notice Emitted when ETH is withdrawn from the paymaster
      * @param recipient The address receiving the withdrawn ETH
@@ -76,7 +76,7 @@ interface IStartaleTokenPaymasterEventsAndErrors {
     );
 
     // Errors
-    
+
     /**
      * @notice Error thrown when the paymaster data has an invalid length
      */

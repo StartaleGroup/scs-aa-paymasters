@@ -49,21 +49,19 @@ abstract contract PriceOracleHelper {
     }
 
     // External functions first (no state-modifying external functions in this contract)
-    
+
     // External view functions
     /**
      * @notice Gets the oracle configuration for a specific token
      * @param _token The token address
      * @return The oracle configuration
      */
-    function getTokenOracleConfig(
-        address _token
-    ) external view returns (IOracleHelper.TokenOracleConfig memory) {
+    function getTokenOracleConfig(address _token) external view returns (IOracleHelper.TokenOracleConfig memory) {
         return tokenOracleConfigurations[_token];
     }
 
     // Public functions next (no state-modifying public functions in this contract)
-    
+
     // Public view functions
     /**
      * @notice Calculates the exchange rate of a token to the native asset
@@ -71,39 +69,34 @@ abstract contract PriceOracleHelper {
      * @param _token The token address
      * @return exchangeRate The exchange rate of the token to the native asset
      */
-    function getExchangeRate(
-        address _token
-    ) public view returns (uint256 exchangeRate) {
+    function getExchangeRate(address _token) public view returns (uint256 exchangeRate) {
         IOracleHelper.TokenOracleConfig memory config = tokenOracleConfigurations[_token];
-        
+
         if (address(config.tokenOracle) == address(0)) {
             revert NoOracleConfiguredForToken(_token);
         }
-        
+
         // Check if the oracle decimals match
         if (IOracle(config.tokenOracle).decimals() != IOracle(nativeAssetToUsdOracle).decimals()) {
             revert OracleDecimalsMismatch();
         }
-        
+
         uint256 tokenPrice = fetchPrice(config.tokenOracle, config.maxOracleRoundAge);
         uint256 nativePrice = fetchPrice(nativeAssetToUsdOracle, nativeOracleConfig.maxOracleRoundAge);
-        
+
         // Calculate: (nativePrice * 10^tokenDecimals) / tokenPrice
-        exchangeRate = (nativePrice * 10**IERC20Metadata(_token).decimals()) / tokenPrice;
+        exchangeRate = (nativePrice * 10 ** IERC20Metadata(_token).decimals()) / tokenPrice;
     }
-    
+
     // Internal functions next, state-modifying first
-    
+
     /**
      * @notice Updates the oracle configuration for a specific token
      * @dev Emits TokenOracleConfigUpdated event
      * @param _token The token address
      * @param _newConfig The new oracle configuration
      */
-    function _updateTokenOracleConfig(
-        address _token,
-        IOracleHelper.TokenOracleConfig memory _newConfig
-    ) internal {
+    function _updateTokenOracleConfig(address _token, IOracleHelper.TokenOracleConfig memory _newConfig) internal {
         _setTokenOracleConfig(_token, _newConfig);
         emit IOracleHelper.TokenOracleConfigUpdated(_token, _newConfig);
     }
@@ -113,9 +106,7 @@ abstract contract PriceOracleHelper {
      * @dev Emits NativeOracleConfigUpdated event
      * @param _newConfig The new oracle configuration
      */
-    function _updateNativeOracleConfig(
-        IOracleHelper.NativeOracleConfig calldata _newConfig
-    ) internal {
+    function _updateNativeOracleConfig(IOracleHelper.NativeOracleConfig calldata _newConfig) internal {
         nativeOracleConfig = _newConfig;
         emit IOracleHelper.NativeOracleConfigUpdated(_newConfig);
     }
@@ -128,18 +119,9 @@ abstract contract PriceOracleHelper {
      * @param _maxOracleRoundAge The maximum acceptable age of the price oracle round
      * @return price The latest price fetched from the Oracle
      */
-    function fetchPrice(
-        IOracle _oracle,
-        uint48 _maxOracleRoundAge
-    ) internal view returns (uint256 price) {
-        (
-            uint80 roundId,
-            int256 answer,
-            ,
-            uint256 updatedAt,
-            uint80 answeredInRound
-        ) = _oracle.latestRoundData();
-        
+    function fetchPrice(IOracle _oracle, uint48 _maxOracleRoundAge) internal view returns (uint256 price) {
+        (uint80 roundId, int256 answer,, uint256 updatedAt, uint80 answeredInRound) = _oracle.latestRoundData();
+
         if (answer <= 0) {
             revert PriceShouldBePositive();
         }
@@ -149,22 +131,19 @@ abstract contract PriceOracleHelper {
         if (answeredInRound < roundId) {
             revert StalePrice();
         }
-        
+
         price = uint256(answer);
     }
-    
+
     // Private functions last, state-modifying first (this contract only has state-modifying private functions)
-    
+
     /**
      * @notice Sets the oracle configuration for a specific token
      * @dev Validates the configuration before setting
      * @param _token The token address
      * @param _config The oracle configuration
      */
-    function _setTokenOracleConfig(
-        address _token,
-        IOracleHelper.TokenOracleConfig memory _config
-    ) private {
+    function _setTokenOracleConfig(address _token, IOracleHelper.TokenOracleConfig memory _config) private {
         if (address(_config.tokenOracle) == address(0)) {
             revert IOracleHelper.InvalidOracleAddress();
         }

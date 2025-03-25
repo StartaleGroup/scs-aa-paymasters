@@ -13,7 +13,7 @@ import {IOracleHelper} from "./IOracleHelper.sol";
  */
 interface IStartaleTokenPaymaster is IStartaleTokenPaymasterEventsAndErrors {
     // Structs
-    
+
     /**
      * @notice Configuration for a supported token
      * @dev Holds fee markup and enabled status
@@ -90,8 +90,8 @@ interface IStartaleTokenPaymaster is IStartaleTokenPaymasterEventsAndErrors {
      * @param _oracleConfig The oracle configuration for the token
      */
     function addSupportedToken(
-        address _token, 
-        uint48 _feeMarkup, 
+        address _token,
+        uint48 _feeMarkup,
         IOracleHelper.TokenOracleConfig calldata _oracleConfig
     ) external;
 
@@ -106,10 +106,8 @@ interface IStartaleTokenPaymaster is IStartaleTokenPaymasterEventsAndErrors {
      * @param _token The token address
      * @param _newOracleConfig The new oracle configuration
      */
-    function updateTokenOracleConfig(
-        address _token, 
-        IOracleHelper.TokenOracleConfig calldata _newOracleConfig
-    ) external;
+    function updateTokenOracleConfig(address _token, IOracleHelper.TokenOracleConfig calldata _newOracleConfig)
+        external;
 
     /**
      * @notice Checks if a token is supported and enabled

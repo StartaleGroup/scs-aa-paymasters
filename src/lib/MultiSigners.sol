@@ -40,7 +40,7 @@ abstract contract MultiSigners {
         if (length == 0) {
             revert NoInitialSigners();
         }
-        
+
         for (uint256 i; i < length;) {
             if (_initialSigners[i] == address(0)) {
                 revert SignerAddressCannotBeZero();
@@ -48,9 +48,9 @@ abstract contract MultiSigners {
             if (_isSmartContract(_initialSigners[i])) {
                 revert SignerAddressCannotBeContract();
             }
-            
+
             signers[_initialSigners[i]] = true;
-            
+
             unchecked {
                 ++i;
             }
@@ -90,7 +90,7 @@ abstract contract MultiSigners {
         if (_isSmartContract(_signer)) {
             revert SignerAddressCannotBeContract();
         }
-        
+
         signers[_signer] = true;
         emit SignerAdded(_signer);
     }

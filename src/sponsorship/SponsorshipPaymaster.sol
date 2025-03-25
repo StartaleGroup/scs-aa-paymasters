@@ -465,12 +465,10 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
      * @param _actualGasCost The actual gas cost incurred
      * @param _actualUserOpFeePerGas The effective gas price used for calculation
      */
-    function _postOp(
-        PostOpMode _mode, 
-        bytes calldata _context, 
-        uint256 _actualGasCost, 
-        uint256 _actualUserOpFeePerGas
-    ) internal override {
+    function _postOp(PostOpMode _mode, bytes calldata _context, uint256 _actualGasCost, uint256 _actualUserOpFeePerGas)
+        internal
+        override
+    {
         (
             address sponsorAccount,
             uint32 feeMarkup,

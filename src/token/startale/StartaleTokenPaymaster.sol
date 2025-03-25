@@ -38,17 +38,17 @@ contract StartaleTokenPaymaster is
     // Constants
     /// @dev Denominator to prevent precision errors when applying fee markup
     uint256 private constant FEE_MARKUP_DENOMINATOR = 1e6;
-    
+
     /// @dev Maximum allowed fee markup
     uint256 private constant MAX_FEE_MARKUP = 2e6;
-    
+
     /// @dev Limit for unaccounted gas cost
     uint256 private constant UNACCOUNTED_GAS_LIMIT = 150_000;
 
     // State variables
     /// @notice Address where token fees are collected
     address public tokenFeesTreasury;
-    
+
     /// @notice Gas amount not accounted for in calculations
     uint256 public unaccountedGas;
 
@@ -120,7 +120,7 @@ contract StartaleTokenPaymaster is
     // No receive/fallback functions in this contract
 
     // External non-view functions
-    
+
     /**
      * @notice Sets the unaccounted gas used in post-op calculations
      * @dev Ensures the value does not exceed `UNACCOUNTED_GAS_LIMIT`
@@ -191,8 +191,8 @@ contract StartaleTokenPaymaster is
      * @param _oracleConfig The oracle configuration for the token
      */
     function addSupportedToken(
-        address _token, 
-        uint48 _feeMarkup, 
+        address _token,
+        uint48 _feeMarkup,
         IOracleHelper.TokenOracleConfig calldata _oracleConfig
     ) external onlyOwner {
         _addSupportedToken(_token, _feeMarkup, _oracleConfig);
@@ -217,10 +217,10 @@ contract StartaleTokenPaymaster is
      * @param _token The token address
      * @param _newOracleConfig The new oracle configuration
      */
-    function updateTokenOracleConfig(
-        address _token, 
-        IOracleHelper.TokenOracleConfig calldata _newOracleConfig
-    ) external onlyOwner {
+    function updateTokenOracleConfig(address _token, IOracleHelper.TokenOracleConfig calldata _newOracleConfig)
+        external
+        onlyOwner
+    {
         if (!tokenConfigs[_token].isEnabled) {
             revert TokenNotSupported(_token);
         }
@@ -232,9 +232,10 @@ contract StartaleTokenPaymaster is
      * @notice Updates the native oracle configuration
      * @param _newNativeOracleConfig The new oracle configuration
      */
-    function updateNativeOracleConfig(
-        IOracleHelper.NativeOracleConfig calldata _newNativeOracleConfig
-    ) external onlyOwner {
+    function updateNativeOracleConfig(IOracleHelper.NativeOracleConfig calldata _newNativeOracleConfig)
+        external
+        onlyOwner
+    {
         _updateNativeOracleConfig(_newNativeOracleConfig);
     }
 
@@ -256,7 +257,7 @@ contract StartaleTokenPaymaster is
     }
 
     // External view/pure functions
-    
+
     /**
      * @notice Generates a hash of the given UserOperation to be signed by the paymaster
      * @param _userOp The UserOperation structure
@@ -319,7 +320,7 @@ contract StartaleTokenPaymaster is
     // No public view/pure functions in this contract (other than those inherited)
 
     // Internal non-view functions
-    
+
     /**
      * @notice Handles the post-operation logic after transaction execution
      * @dev Adjusts gas costs, refunds excess gas, and ensures sufficient paymaster balance
@@ -328,14 +329,12 @@ contract StartaleTokenPaymaster is
      * @param _actualGasCost The actual gas cost incurred
      * @param _actualUserOpFeePerGas The effective gas price used for calculation
      */
-    function _postOp(
-        PostOpMode _mode, 
-        bytes calldata _context, 
-        uint256 _actualGasCost, 
-        uint256 _actualUserOpFeePerGas
-    ) internal override {
+    function _postOp(PostOpMode _mode, bytes calldata _context, uint256 _actualGasCost, uint256 _actualUserOpFeePerGas)
+        internal
+        override
+    {
         (_mode); // Unused parameter
-        
+
         (
             address sender,
             address tokenAddress,
@@ -344,7 +343,7 @@ contract StartaleTokenPaymaster is
             uint256 exchangeRate,
             uint48 appliedFeeMarkup
         ) = abi.decode(_context, (address, address, uint256, uint256, uint256, uint48));
-        
+
         uint256 actualGas = _actualGasCost / _actualUserOpFeePerGas;
 
         // If exchangeRate is 0, it means it was not set in the validatePaymasterUserOp => independent mode
@@ -383,7 +382,7 @@ contract StartaleTokenPaymaster is
     }
 
     // Internal view/pure functions
-    
+
     /**
      * @notice Validates the UserOperation and deducts the required gas sponsorship amount
      * @param _userOp The UserOperation being validated
@@ -397,7 +396,7 @@ contract StartaleTokenPaymaster is
         uint256 _requiredPreFund
     ) internal view override returns (bytes memory, uint256) {
         (_userOpHash, _requiredPreFund); // Unused parameters
-        
+
         (PaymasterMode mode, bytes calldata modeSpecificData) = _userOp.paymasterAndData.parsePaymasterAndData();
 
         // We only have two modes for now. Change this if we add more modes
@@ -480,22 +479,17 @@ contract StartaleTokenPaymaster is
 
             // Prepare context for postOp
             bytes memory context = abi.encode(
-                _userOp.sender, 
-                tokenAddress, 
-                preOpGasApproximation, 
-                executionGasLimit, 
-                exchangeRate, 
-                appliedFeeMarkup
+                _userOp.sender, tokenAddress, preOpGasApproximation, executionGasLimit, exchangeRate, appliedFeeMarkup
             );
             return (context, validationData);
         }
-        
+
         // This should never be reached due to the mode check above
         revert InvalidPaymasterMode();
     }
 
     // Private non-view functions
-    
+
     /**
      * @notice Internal function to withdraw ERC20 tokens
      * @param _token The token to withdraw
@@ -516,11 +510,9 @@ contract StartaleTokenPaymaster is
      * @param _feeMarkup The fee markup for the token
      * @param _oracleConfig The oracle configuration for the token
      */
-    function _addSupportedToken(
-        address _token, 
-        uint48 _feeMarkup, 
-        IOracleHelper.TokenOracleConfig memory _oracleConfig
-    ) private {
+    function _addSupportedToken(address _token, uint48 _feeMarkup, IOracleHelper.TokenOracleConfig memory _oracleConfig)
+        private
+    {
         if (_token == address(0)) {
             revert InvalidTokenAddress();
         }

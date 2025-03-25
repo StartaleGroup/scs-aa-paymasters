@@ -10,7 +10,7 @@ import {IOracle} from "./IOracle.sol";
  */
 interface IOracleHelper {
     // Structs
-    
+
     /**
      * @notice Configuration for a token's price oracle
      * @param tokenOracle The oracle contract for token to USD price
@@ -33,7 +33,7 @@ interface IOracleHelper {
     }
 
     // Events
-    
+
     /**
      * @notice Emitted when a token's oracle configuration is updated
      * @param token The address of the token whose oracle configuration was updated
@@ -48,7 +48,7 @@ interface IOracleHelper {
     event NativeOracleConfigUpdated(NativeOracleConfig newConfig);
 
     // Errors
-    
+
     /**
      * @notice Error thrown when array lengths don't match in initialization or updates
      * @dev Typically occurs when token addresses and configurations arrays have different lengths
