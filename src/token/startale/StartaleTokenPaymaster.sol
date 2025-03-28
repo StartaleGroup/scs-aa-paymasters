@@ -315,9 +315,45 @@ contract StartaleTokenPaymaster is
         return tokenConfigs[_token].feeMarkup;
     }
 
-    // No public non-view functions in this contract
+    /**
+     * @notice Parses the paymaster data to extract relevant information for external mode
+     * @param _paymasterAndData The encoded paymaster data
+     * @return validUntil The timestamp until which the operation is valid
+     * @return validAfter The timestamp after which the operation is valid
+     * @return tokenAddress The address of the token to be used for the operation
+     * @return exchangeRate The exchange rate of the token
+     * @return appliedFeeMarkup The fee markup for the operation
+     * @return paymasterValidationGasLimit The gas limit for paymaster validation
+     * @return paymasterPostOpGasLimit The gas limit for post-operation
+     * @return signature The signature validating the operation
+     */
+    function parsePaymasterAndDataForExternalMode(bytes calldata _paymasterAndData)
+        public
+        pure
+        returns (
+            uint48 validUntil,
+            uint48 validAfter,
+            address tokenAddress,
+            uint256 exchangeRate,
+            uint48 appliedFeeMarkup,
+            uint128 paymasterValidationGasLimit,
+            uint128 paymasterPostOpGasLimit,
+            bytes calldata signature
+        )
+    {
+        (PaymasterMode mode, bytes calldata modeSpecificData) = _paymasterAndData.parsePaymasterAndData();
+        if (mode != PaymasterMode.EXTERNAL) {
+            revert InvalidPaymasterMode();
+        }
 
-    // No public view/pure functions in this contract (other than those inherited)
+        paymasterValidationGasLimit =
+            uint128(bytes16(_paymasterAndData[PAYMASTER_VALIDATION_GAS_OFFSET:PAYMASTER_POSTOP_GAS_OFFSET]));
+        paymasterPostOpGasLimit = uint128(bytes16(_paymasterAndData[PAYMASTER_POSTOP_GAS_OFFSET:PAYMASTER_DATA_OFFSET]));
+
+        (validUntil, validAfter, tokenAddress, exchangeRate, appliedFeeMarkup, signature) = modeSpecificData.parseExternalModeSpecificData();
+    }
+
+    // No public non-view functions in this contract
 
     // Internal non-view functions
 
