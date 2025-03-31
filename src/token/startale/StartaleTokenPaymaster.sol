@@ -350,7 +350,8 @@ contract StartaleTokenPaymaster is
             uint128(bytes16(_paymasterAndData[PAYMASTER_VALIDATION_GAS_OFFSET:PAYMASTER_POSTOP_GAS_OFFSET]));
         paymasterPostOpGasLimit = uint128(bytes16(_paymasterAndData[PAYMASTER_POSTOP_GAS_OFFSET:PAYMASTER_DATA_OFFSET]));
 
-        (validUntil, validAfter, tokenAddress, exchangeRate, appliedFeeMarkup, signature) = modeSpecificData.parseExternalModeSpecificData();
+        (validUntil, validAfter, tokenAddress, exchangeRate, appliedFeeMarkup, signature) =
+            modeSpecificData.parseExternalModeSpecificData();
     }
 
     // No public non-view functions in this contract
