@@ -208,6 +208,47 @@ contract TestTokenPaymaster is TestBase {
         assertApproxEqRel(totalGasFeePaid, gasPaidBySAInNativeTokens, 0.02e18);
     }
 
+    function test_ParsePaymasterAndDataForExternalMode() external view {
+        PackedUserOperation memory userOp = buildUserOpWithCalldata(ALICE, "", 0, 0);
+
+        TokenPaymasterDataExternalMode memory pmData = TokenPaymasterDataExternalMode({
+            validationGasLimit: uint128(100_000),
+            postOpGasLimit: uint128(100_000),
+            mode: IStartaleTokenPaymaster.PaymasterMode.EXTERNAL,
+            validUntil: uint48(block.timestamp + 1 days),
+            validAfter: uint48(block.timestamp),
+            tokenAddress: address(testToken),
+            exchangeRate: 1e18,
+            appliedFeeMarkup: 1e6
+        });
+
+        bytes memory pmSignature;
+
+        (userOp.paymasterAndData, pmSignature) =
+            generateAndSignTokenPaymasterDataExternalMode(userOp, PAYMASTER_SIGNER_A, tokenPaymaster, pmData);
+
+        (
+            uint48 parsedValidUntil,
+            uint48 parsedValidAfter,
+            address parsedTokenAddress,
+            uint256 parsedExchangeRate,
+            uint48 parsedAppliedFeeMarkup,
+            uint128 parsedPaymasterValidationGasLimit,
+            uint128 parsedPaymasterPostOpGasLimit,
+            bytes memory parsedSignature
+        ) = tokenPaymaster.parsePaymasterAndDataForExternalMode(userOp.paymasterAndData);
+
+        assertEq(pmData.validUntil, parsedValidUntil);
+        assertEq(pmData.validAfter, parsedValidAfter);
+        assertEq(pmData.tokenAddress, parsedTokenAddress);
+        assertEq(pmData.exchangeRate, parsedExchangeRate);
+        assertEq(pmData.appliedFeeMarkup, parsedAppliedFeeMarkup);
+        assertEq(pmData.validationGasLimit, parsedPaymasterValidationGasLimit);
+        assertEq(pmData.postOpGasLimit, parsedPaymasterPostOpGasLimit);
+        assertEq(parsedSignature, pmSignature);
+        assertEq(parsedSignature.length, userOp.signature.length);
+    }
+
     function test_Success_TokenPaymaster_ExternalMode_WithPremium() external {
         tokenPaymaster.deposit{value: 10 ether}();
         testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
