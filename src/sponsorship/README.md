@@ -1,4 +1,4 @@
-# Sponsorship Paymaster Contract - EP v0.7
+# Sponsorship Paymaster Contract - EP v0.7.0
 
 The **Sponsorship Paymaster** contract facilitates **gas sponsorship** for **UserOperations** in **ERC-4337 Account Abstraction**. It securely manages **user balances**, validates **gas sponsorships**, and ensures **secure withdrawals** using **EntryPoint**.
 
@@ -8,7 +8,7 @@ The **Sponsorship Paymaster** contract facilitates **gas sponsorship** for **Use
 - Users deposit **ETH** to fund gas sponsorships.
 - Deposits are recorded in `sponsorBalances` and also **transferred to EntryPoint**.
 - **Paymaster sponsors UserOperations**, deducting required gas fees from the sender’s deposit.
-- A **price markup** (default `1e6` ) allowing **dynamic fee adjustments**.
+- A **price markup** (default `1e6` ) allowing **dynamic fee adjustments**. (charging up to 100# premium)
 
 ---
 
@@ -18,25 +18,24 @@ The **Sponsorship Paymaster** contract facilitates **gas sponsorship** for **Use
   - **`validUntil` & `validAfter`**: Ensures time validity.
   - **`feeMarkup`**: Applied to gas fees.
   - **`signature`**: Validates sponsorship authorization.
-- **Ensures valid signatures** using **ECDSA recovery**.
+- **Ensures valid signatures** using **ECDSA recovery**. (any-one-out-of-n-signers using MultiSigner lib)
 - **Verifies funding account balance** to cover transaction costs.
 - **Deducts gas fees** and stores **context for `_postOp`**.
 
 ---
 
 ### 3️⃣ Post-Operation Gas Adjustments (`_postOp`)
-- **Calculates actual gas costs** and adjusts for **EntryPoint overhead gas**.
-- **Applies price markup** and computes the premium and sends to feeCollector address.
+- **Calculates actual gas costs** and adjusts for **EntryPoint overhead gas**.(unaccountedGas is gas not accounted for postOp and within the entrypoint)
+- **Applies price markup** and computes the premium and sends to feeCollector address.(by updating sponsorBalances for the Entrypoint)
 - **Refunds excess gas fees** if overcharged.
-- **Ensures sufficient funds** remain in the funding account.
 
 ---
 
-### 4️⃣ User Withdrawals
+### 4️⃣ User Withdrawals (Delayed Withdrawals)
 - Users **request withdrawals** with `requestWithdrawal`.
 - **Execute withdrawals via EntryPoint**, ensuring:
   - **Funds exist** in both **user balance & EntryPoint**.
-  - **Withdrawal delay is respected** to prevent abuse.
+  - **Withdrawal delay is respected**
   - **EntryPoint securely processes the withdrawal**.
 - **Re-initiate withdrawal requests** by resetting `lastWithdrawalTimestamp`.
 
