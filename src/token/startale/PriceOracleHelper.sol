@@ -89,29 +89,30 @@ abstract contract PriceOracleHelper {
         }
 
         // If it is set to zero(which is allowed), we don't need to check the sequencer uptime because it is not L2 like arbitrum, optimism, base or soneium.
-        if(sequencerUptimeOracle != IOracle(address(0))) {
-
+        if (sequencerUptimeOracle != IOracle(address(0))) {
             (
-            /*uint80 roundID*/,
-            int256 answer,
-            uint256 startedAt,
-            /*uint256 updatedAt*/,
-            /*uint80 answeredInRound*/
-        ) = sequencerUptimeOracle.latestRoundData();
+                /*uint80 roundID*/
+                ,
+                int256 answer,
+                uint256 startedAt,
+                /*uint256 updatedAt*/
+                ,
+                /*uint80 answeredInRound*/
+            ) = sequencerUptimeOracle.latestRoundData();
 
-        // Answer == 0: Sequencer is up
-        // Answer == 1: Sequencer is down
-        bool isSequencerUp = answer == 0;
-        if (!isSequencerUp) {
-            revert SequencerDown();
-        }
+            // Answer == 0: Sequencer is up
+            // Answer == 1: Sequencer is down
+            bool isSequencerUp = answer == 0;
+            if (!isSequencerUp) {
+                revert SequencerDown();
+            }
 
-        // Make sure the grace period has passed after the
-        // sequencer is back up.
-        uint256 timeSinceUp = block.timestamp - startedAt;
-        if (timeSinceUp <= GRACE_PERIOD_TIME) {
-            revert GracePeriodNotOver();
-        }
+            // Make sure the grace period has passed after the
+            // sequencer is back up.
+            uint256 timeSinceUp = block.timestamp - startedAt;
+            if (timeSinceUp <= GRACE_PERIOD_TIME) {
+                revert GracePeriodNotOver();
+            }
         }
 
         uint256 tokenPrice = fetchPrice(config.tokenOracle, config.maxOracleRoundAge);
