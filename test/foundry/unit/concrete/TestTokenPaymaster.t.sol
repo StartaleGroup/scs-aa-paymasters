@@ -46,6 +46,7 @@ contract TestTokenPaymaster is TestBase {
             _tokenFeesTreasury: PAYMASTER_FEE_COLLECTOR.addr,
             _unaccountedGas: UNACCOUNTED_GAS,
             _nativeAssetToUsdOracle: address(nativeAssetToUsdOracle),
+            _sequencerUptimeOracle: address(0),
             _nativeAssetMaxOracleRoundAge: MAX_ORACLE_ROUND_AGE,
             _nativeAssetDecimals: 18,
             _independentTokens: _toSingletonArray(address(testToken)),
@@ -68,6 +69,7 @@ contract TestTokenPaymaster is TestBase {
             PAYMASTER_FEE_COLLECTOR.addr,
             UNACCOUNTED_GAS, // unaccounted gas
             address(nativeAssetToUsdOracle),
+            address(0),
             MAX_ORACLE_ROUND_AGE,
             18, // native token decimals
             _toSingletonArray(address(testToken)),
@@ -756,6 +758,7 @@ contract TestTokenPaymaster is TestBase {
             PAYMASTER_FEE_COLLECTOR.addr,
             UNACCOUNTED_GAS, // unaccounted gas
             address(nativeAssetToUsdOracle),
+            address(0),
             MAX_ORACLE_ROUND_AGE,
             18, // native token decimals
             _toSingletonArray(address(testToken)),
@@ -785,6 +788,7 @@ contract TestTokenPaymaster is TestBase {
             PAYMASTER_FEE_COLLECTOR.addr,
             UNACCOUNTED_GAS, // unaccounted gas
             address(nativeAssetToUsdOracle),
+            address(0),
             MAX_ORACLE_ROUND_AGE,
             18, // native token decimals
             _toSingletonArray(address(testToken)),
@@ -818,6 +822,7 @@ contract TestTokenPaymaster is TestBase {
             address(0),
             UNACCOUNTED_GAS, // unaccounted gas
             address(nativeAssetToUsdOracle),
+            address(0),
             MAX_ORACLE_ROUND_AGE,
             18, // native token decimals
             _toSingletonArray(address(testToken)),

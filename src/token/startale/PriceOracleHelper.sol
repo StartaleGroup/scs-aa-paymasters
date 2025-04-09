@@ -17,9 +17,14 @@ abstract contract PriceOracleHelper {
     error IncompleteRound();
     error StalePrice();
     error OracleDecimalsMismatch();
+    error SequencerDown();
+    error GracePeriodNotOver();
+
+    uint256 private constant GRACE_PERIOD_TIME = 3600;
 
     // State variables
     IOracle public nativeAssetToUsdOracle; // ETH -> USD price oracle
+    IOracle public sequencerUptimeOracle; // Sequencer uptime oracle
     IOracleHelper.NativeOracleConfig public nativeOracleConfig;
     mapping(address => IOracleHelper.TokenOracleConfig) public tokenOracleConfigurations;
 
@@ -32,6 +37,7 @@ abstract contract PriceOracleHelper {
      */
     constructor(
         address _nativeAssetToUsdOracle,
+        address _sequencerUptimeOracle,
         IOracleHelper.NativeOracleConfig memory _nativeOracleConfig,
         address[] memory _tokens,
         IOracleHelper.TokenOracleConfig[] memory _tokenOracleConfigs
@@ -41,6 +47,7 @@ abstract contract PriceOracleHelper {
         }
 
         nativeAssetToUsdOracle = IOracle(_nativeAssetToUsdOracle);
+        sequencerUptimeOracle = IOracle(_sequencerUptimeOracle);
         nativeOracleConfig = _nativeOracleConfig;
 
         for (uint256 i = 0; i < _tokens.length; i++) {
@@ -79,6 +86,32 @@ abstract contract PriceOracleHelper {
         // Check if the oracle decimals match
         if (IOracle(config.tokenOracle).decimals() != IOracle(nativeAssetToUsdOracle).decimals()) {
             revert OracleDecimalsMismatch();
+        }
+
+        // If it is set to zero(which is allowed), we don't need to check the sequencer uptime because it is not L2 like arbitrum, optimism, base or soneium.
+        if(sequencerUptimeOracle != IOracle(address(0))) {
+
+            (
+            /*uint80 roundID*/,
+            int256 answer,
+            uint256 startedAt,
+            /*uint256 updatedAt*/,
+            /*uint80 answeredInRound*/
+        ) = sequencerUptimeOracle.latestRoundData();
+
+        // Answer == 0: Sequencer is up
+        // Answer == 1: Sequencer is down
+        bool isSequencerUp = answer == 0;
+        if (!isSequencerUp) {
+            revert SequencerDown();
+        }
+
+        // Make sure the grace period has passed after the
+        // sequencer is back up.
+        uint256 timeSinceUp = block.timestamp - startedAt;
+        if (timeSinceUp <= GRACE_PERIOD_TIME) {
+            revert GracePeriodNotOver();
+        }
         }
 
         uint256 tokenPrice = fetchPrice(config.tokenOracle, config.maxOracleRoundAge);
