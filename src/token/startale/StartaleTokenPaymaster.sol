@@ -519,6 +519,11 @@ contract StartaleTokenPaymaster is
                 ).tryRecover(signature)
             );
 
+            // STPM-10
+            // if (recoveredSigner == address(0)) {
+            //     revert PotentiallyMalformedSignature();
+            // }
+
             bool isValidSig = signers[recoveredSigner];
 
             uint256 validationData = _packValidationData(!isValidSig, validUntil, validAfter);
