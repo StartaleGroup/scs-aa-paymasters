@@ -689,7 +689,7 @@ contract TestTokenPaymaster is TestBase {
         vm.stopPrank();
     }
 
-    function test_RevertIf_Mismatching_Oracle_Decimals_Independent_Mode() external {
+    function test_DoesNotRevertIf_Mismatching_Oracle_Decimals_Independent_Mode() external {
         vm.warp(1742296776);
         tokenPaymaster.deposit{value: 10 ether}();
         testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
@@ -735,10 +735,6 @@ contract TestTokenPaymaster is TestBase {
         // Execute the operation
         startPrank(BUNDLER.addr);
         uint256 gasValue = gasleft();
-
-        vm.expectEmit(false, false, false, false, ENTRYPOINT_ADDRESS);
-        // Review: can emit exact expected values and reason: OracleDecimalsMismatch
-        emit IEntryPoint.PostOpRevertReason(userOpHash, address(0), 0, new bytes(0));
 
         ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
         gasValue = gasValue - gasleft();

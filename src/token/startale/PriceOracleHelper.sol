@@ -25,6 +25,7 @@ abstract contract PriceOracleHelper {
     // State variables
     IOracle public nativeAssetToUsdOracle; // ETH -> USD price oracle
     IOracle public sequencerUptimeOracle; // Sequencer uptime oracle
+    uint8 internal nativeAssetToUsdOracleDecimals;
     IOracleHelper.NativeOracleConfig public nativeOracleConfig;
     mapping(address => IOracleHelper.TokenOracleConfig) public tokenOracleConfigurations;
 
@@ -50,6 +51,7 @@ abstract contract PriceOracleHelper {
         nativeAssetToUsdOracle = IOracle(_nativeAssetToUsdOracle);
         sequencerUptimeOracle = IOracle(_sequencerUptimeOracle);
         nativeOracleConfig = _nativeOracleConfig;
+        nativeAssetToUsdOracleDecimals = nativeAssetToUsdOracle.decimals();
 
         for (uint256 i = 0; i < _tokens.length; i++) {
             _setTokenOracleConfig(_tokens[i], _tokenOracleConfigs[i]);
@@ -84,10 +86,7 @@ abstract contract PriceOracleHelper {
             revert NoOracleConfiguredForToken(_token);
         }
 
-        // Check if the oracle decimals match
-        if (IOracle(config.tokenOracle).decimals() != IOracle(nativeAssetToUsdOracle).decimals()) {
-            revert OracleDecimalsMismatch();
-        }
+        uint8 tokenOracleDecimals = IOracle(config.tokenOracle).decimals();
 
         // If it is set to zero(which is allowed), we don't need to check the sequencer uptime because it is not L2 like arbitrum, optimism, base or soneium.
         if (sequencerUptimeOracle != IOracle(address(0))) {
@@ -118,6 +117,12 @@ abstract contract PriceOracleHelper {
 
         uint256 tokenPrice = fetchPrice(config.tokenOracle, config.maxOracleRoundAge);
         uint256 nativePrice = fetchPrice(nativeAssetToUsdOracle, nativeOracleConfig.maxOracleRoundAge);
+
+        if (tokenOracleDecimals > nativeAssetToUsdOracleDecimals) {
+            nativePrice *= 10 ** (tokenOracleDecimals - nativeAssetToUsdOracleDecimals);
+        } else if (tokenOracleDecimals < nativeAssetToUsdOracleDecimals) {
+            tokenPrice *= 10 ** (nativeAssetToUsdOracleDecimals - tokenOracleDecimals);
+        }
 
         // Calculate: (nativePrice * 10^tokenDecimals) / tokenPrice
         exchangeRate = (nativePrice * 10 ** IERC20Metadata(_token).decimals()) / tokenPrice;
