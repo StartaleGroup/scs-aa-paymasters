@@ -489,6 +489,10 @@ contract StartaleTokenPaymaster is
                 bytes calldata signature
             ) = modeSpecificData.parseExternalModeSpecificData();
 
+            if (exchangeRate == 0) {
+                revert InvalidExchangeRate(tokenAddress);
+            }
+
             // Validate signature length
             if (signature.length != 64 && signature.length != 65) {
                 revert PaymasterSignatureLengthInvalid();

@@ -168,4 +168,10 @@ interface IStartaleTokenPaymasterEventsAndErrors {
      * @notice Error thrown when an invalid token fees treasury address is provided
      */
     error InvalidTokenFeesTreasury();
+
+    /**
+     * @notice Error thrown when an invalid exchange rate is provided
+     * @param tokenAddress The address of the token with the invalid exchange rate
+     */
+    error InvalidExchangeRate(address tokenAddress);
 }
