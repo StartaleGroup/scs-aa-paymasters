@@ -426,25 +426,16 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
             revert InvalidPriceMarkup();
         }
 
-        // Calculate the max penalty to ensure the paymaster doesn't underpay
-        // Note: This is just a check to approximate max charge including penalty
-        uint256 maxPenalty = (
-            (
-                uint128(uint256(_userOp.accountGasLimits))
-                    + uint128(bytes16(_userOp.paymasterAndData[PAYMASTER_POSTOP_GAS_OFFSET:PAYMASTER_DATA_OFFSET]))
-            ) * 10 * _userOp.unpackMaxFeePerGas()
-        ) / 100;
-
         // Calculate effective cost including unaccountedGas and feeMarkup
         uint256 effectiveCost =
             ((_requiredPreFund + (unaccountedGas * _userOp.unpackMaxFeePerGas())) * feeMarkup) / FEE_MARKUP_DENOMINATOR;
 
         // Ensure the paymaster can cover the effective cost + max penalty
-        if (effectiveCost + maxPenalty > sponsorBalances[sponsorAccount]) {
-            revert InsufficientFunds(sponsorAccount, sponsorBalances[sponsorAccount], effectiveCost + maxPenalty);
+        if (effectiveCost > sponsorBalances[sponsorAccount]) {
+            revert InsufficientFunds(sponsorAccount, sponsorBalances[sponsorAccount], effectiveCost);
         }
 
-        sponsorBalances[sponsorAccount] -= (effectiveCost + maxPenalty);
+        sponsorBalances[sponsorAccount] -= (effectiveCost);
         emit UserOperationSponsored(_userOpHash, _userOp.getSender());
 
         // Save some state to help calculate the expected penalty during postOp
@@ -453,7 +444,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         uint256 executionGasLimit = _userOp.unpackCallGasLimit() + _userOp.unpackPostOpGasLimit();
 
         return (
-            abi.encode(sponsorAccount, feeMarkup, effectiveCost + maxPenalty, preOpGasApproximation, executionGasLimit),
+            abi.encode(sponsorAccount, feeMarkup, effectiveCost, preOpGasApproximation, executionGasLimit),
             validationData
         );
     }
