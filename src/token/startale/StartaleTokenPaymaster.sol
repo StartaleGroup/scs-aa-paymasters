@@ -77,6 +77,7 @@ contract StartaleTokenPaymaster is
         address _tokenFeesTreasury,
         uint256 _unaccountedGas,
         address _nativeAssetToUsdOracle,
+        address _sequencerUptimeOracle,
         uint48 _nativeAssetMaxOracleRoundAge,
         uint8 _nativeAssetDecimals,
         address[] memory _independentTokens,
@@ -87,6 +88,7 @@ contract StartaleTokenPaymaster is
         MultiSigners(_signers)
         PriceOracleHelper(
             _nativeAssetToUsdOracle,
+            _sequencerUptimeOracle,
             IOracleHelper.NativeOracleConfig({
                 maxOracleRoundAge: _nativeAssetMaxOracleRoundAge,
                 nativeAssetDecimals: _nativeAssetDecimals

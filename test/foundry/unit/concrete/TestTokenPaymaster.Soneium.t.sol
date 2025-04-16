@@ -24,6 +24,7 @@ contract TestTokenPaymasterSoneium is TestBase {
     // MockOracle public tokenToUsdOracle;
 
     IOracle public nativeOracle = IOracle(0x291cF980BA12505D65ee01BDe0882F1d5e533525); // soneium ETH/USD chainlink feed
+    IOracle public sequencerUptimeOracle = IOracle(0xaDE1b9AbB98c6A542E4B49db2588a3Ec4bF7Cdf0); // soneium L2 Sequencer Uptime Status Feed
     IOracle public tokenOracle = IOracle(0xBa5C28f78eFdC03C37e2C46880314386aFf43228); // soneium ASTR/USD chainlink feed
     IERC20 public astr = IERC20(0x2CAE934a1e84F693fbb78CA5ED3B0A6893259441); // soneium ASTR
     TestCounter public testCounter;
@@ -49,6 +50,7 @@ contract TestTokenPaymasterSoneium is TestBase {
             _tokenFeesTreasury: PAYMASTER_FEE_COLLECTOR.addr,
             _unaccountedGas: UNACCOUNTED_GAS,
             _nativeAssetToUsdOracle: address(nativeOracle),
+            _sequencerUptimeOracle: address(sequencerUptimeOracle),
             _nativeAssetMaxOracleRoundAge: MAX_ORACLE_ROUND_AGE,
             _nativeAssetDecimals: 18,
             _independentTokens: _toSingletonArray(address(astr)),
@@ -74,6 +76,7 @@ contract TestTokenPaymasterSoneium is TestBase {
             PAYMASTER_FEE_COLLECTOR.addr,
             UNACCOUNTED_GAS, // unaccounted gas
             address(nativeOracle),
+            address(sequencerUptimeOracle),
             MAX_ORACLE_ROUND_AGE,
             18, // native token decimals
             _toSingletonArray(address(astr)),
