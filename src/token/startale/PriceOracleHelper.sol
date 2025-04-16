@@ -151,6 +151,17 @@ abstract contract PriceOracleHelper {
         emit IOracleHelper.NativeOracleConfigUpdated(_newConfig);
     }
 
+    /**
+     * @notice Updates the native asset to USD oracle
+     * @dev Emits NativeAssetToUsdOracleUpdated event
+     * @param _newNativeAssetToUsdOracle The new native asset to USD oracle address
+     */
+    function _updateNativeAssetToUsdOracle(address _newNativeAssetToUsdOracle) internal {
+        nativeAssetToUsdOracle = IOracle(_newNativeAssetToUsdOracle);
+        nativeAssetToUsdOracleDecimals = nativeAssetToUsdOracle.decimals();
+        emit IOracleHelper.NativeAssetToUsdOracleUpdated(_newNativeAssetToUsdOracle);
+    }
+
     // Internal view functions
     /**
      * @notice Fetches the latest price from the given Oracle

@@ -47,6 +47,12 @@ interface IOracleHelper {
      */
     event NativeOracleConfigUpdated(NativeOracleConfig newConfig);
 
+    /**
+     * @notice Emitted when the native asset to USD oracle is updated
+     * @param newNativeAssetToUsdOracle The new native asset to USD oracle address
+     */
+    event NativeAssetToUsdOracleUpdated(address newNativeAssetToUsdOracle);
+
     // Errors
 
     /**

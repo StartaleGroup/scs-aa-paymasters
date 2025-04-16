@@ -242,6 +242,14 @@ contract StartaleTokenPaymaster is
     }
 
     /**
+     * @notice Updates the native asset to USD oracle
+     * @param _newNativeAssetToUsdOracle The new native asset to USD oracle address
+     */
+    function updateNativeAssetToUsdOracle(address _newNativeAssetToUsdOracle) external onlyOwner {
+        _updateNativeAssetToUsdOracle(_newNativeAssetToUsdOracle);
+    }
+
+    /**
      * @notice Updates the fee markup for a specific token
      * @param _token The token address to update
      * @param _newFeeMarkup The new fee markup value
