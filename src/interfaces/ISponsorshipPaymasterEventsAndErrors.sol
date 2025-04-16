@@ -105,6 +105,16 @@ interface ISponsorshipPaymasterEventsAndErrors {
      */
     error WithdrawalFailed();
 
+    /**
+     * @notice Error thrown when the minimum deposit is set to zero
+     */
+    error MinDepositCanNotBeZero();
+
+    /**
+     * @notice Error thrown when the withdrawal delay is set to a value greater than 1 day
+     */
+    error WithdrawalDelayTooLong();
+
     // Events
 
     /**

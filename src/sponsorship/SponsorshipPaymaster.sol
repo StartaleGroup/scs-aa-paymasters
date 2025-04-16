@@ -118,6 +118,9 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
      * @param _newMinDeposit The new minimum deposit value
      */
     function setMinDeposit(uint256 _newMinDeposit) external onlyOwner {
+        if (_newMinDeposit == 0) {
+            revert MinDepositCanNotBeZero();
+        }
         emit MinDepositChanged(minDeposit, _newMinDeposit);
         minDeposit = _newMinDeposit;
     }
@@ -149,6 +152,9 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
      * @param _newWithdrawalDelay The new withdrawal delay in seconds
      */
     function setWithdrawalDelay(uint256 _newWithdrawalDelay) external onlyOwner {
+        if (_newWithdrawalDelay > 86400) { // 1 day
+            revert WithdrawalDelayTooLong();
+        }
         sponsorWithdrawalDelay = _newWithdrawalDelay;
     }
 
@@ -208,6 +214,9 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
      * @param _amount The amount of ETH to withdraw
      */
     function withdrawEth(address payable _recipient, uint256 _amount) external payable onlyOwner nonReentrant {
+        if (_recipient == address(0)) {
+            revert InvalidWithdrawalAddress();
+        }
         (bool success,) = _recipient.call{value: _amount}("");
         if (!success) {
             revert WithdrawalFailed();

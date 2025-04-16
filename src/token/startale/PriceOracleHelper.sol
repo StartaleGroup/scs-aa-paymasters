@@ -21,6 +21,7 @@ abstract contract PriceOracleHelper {
     error GracePeriodNotOver();
 
     uint256 private constant GRACE_PERIOD_TIME = 3600;
+    uint48 private constant MAX_ALLOWED_ROUND_AGE = 172800; // 48 hours
 
     // State variables
     IOracle public nativeAssetToUsdOracle; // ETH -> USD price oracle
@@ -147,6 +148,9 @@ abstract contract PriceOracleHelper {
      * @param _newConfig The new oracle configuration
      */
     function _updateNativeOracleConfig(IOracleHelper.NativeOracleConfig calldata _newConfig) internal {
+        if (_newConfig.maxOracleRoundAge == 0 || _newConfig.maxOracleRoundAge > MAX_ALLOWED_ROUND_AGE) {
+            revert IOracleHelper.InvalidMaxOracleRoundAge();
+        }
         nativeOracleConfig = _newConfig;
         emit IOracleHelper.NativeOracleConfigUpdated(_newConfig);
     }
@@ -198,7 +202,7 @@ abstract contract PriceOracleHelper {
         if (address(_config.tokenOracle) == address(0)) {
             revert IOracleHelper.InvalidOracleAddress();
         }
-        if (_config.maxOracleRoundAge == 0) {
+        if (_config.maxOracleRoundAge == 0 || _config.maxOracleRoundAge > MAX_ALLOWED_ROUND_AGE) {
             revert IOracleHelper.InvalidMaxOracleRoundAge();
         }
 

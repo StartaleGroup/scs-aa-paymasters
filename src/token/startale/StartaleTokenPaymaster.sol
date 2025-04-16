@@ -163,6 +163,9 @@ contract StartaleTokenPaymaster is
      * @param _amount The amount of ETH to withdraw
      */
     function withdrawEth(address payable _recipient, uint256 _amount) external payable onlyOwner nonReentrant {
+         if (_recipient == address(0)) {
+            revert InvalidWithdrawalAddress();
+        }
         (bool success,) = _recipient.call{value: _amount}("");
         if (!success) {
             revert WithdrawalFailed();

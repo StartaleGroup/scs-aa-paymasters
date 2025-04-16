@@ -27,6 +27,12 @@ abstract contract MultiSigners {
     /// @notice Error when a signer address is a contract
     error SignerAddressCannotBeContract();
 
+    /// @notice Error when a signer is not added
+    error SignerNotAdded(address signer);
+
+    /// @notice Error when a signer is already added
+    error SignerAlreadyAdded(address signer);
+
     // State variables
     /// @notice Mapping of valid signers
     mapping(address account => bool isValidSigner) public signers;
@@ -74,6 +80,9 @@ abstract contract MultiSigners {
      * @param _signer Address of the signer to remove
      */
     function _removeSigner(address _signer) internal virtual {
+        if (!signers[_signer]) {
+            revert SignerNotAdded(_signer);
+        }
         delete signers[_signer];
         emit SignerRemoved(_signer);
     }
@@ -84,6 +93,9 @@ abstract contract MultiSigners {
      * @param _signer Address of the signer to add
      */
     function _addSigner(address _signer) internal virtual {
+        if (signers[_signer]) {
+            revert SignerAlreadyAdded(_signer);
+        }
         if (_signer == address(0)) {
             revert SignerAddressCannotBeZero();
         }
