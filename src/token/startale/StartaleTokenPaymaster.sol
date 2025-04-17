@@ -430,6 +430,8 @@ contract StartaleTokenPaymaster is
         uint256 tokenAmount = (adjustedGasCost * exchangeRate + (10 ** nativeOracleConfig.nativeAssetDecimals) - 1)
             / (10 ** nativeOracleConfig.nativeAssetDecimals);
 
+        if (tokenAmount == 0) return;
+
         if (SafeTransferLib.trySafeTransferFrom(tokenAddress, sender, tokenFeesTreasury, tokenAmount)) {
             emit PaidGasInTokens(sender, tokenAddress, tokenAmount, appliedFeeMarkup, exchangeRate);
         } else {
