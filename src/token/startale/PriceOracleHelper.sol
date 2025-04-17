@@ -181,10 +181,10 @@ abstract contract PriceOracleHelper {
             revert PriceShouldBePositive();
         }
         if (updatedAt < block.timestamp - _maxOracleRoundAge) {
-            revert IncompleteRound();
+            revert StalePrice();
         }
         if (answeredInRound < roundId) {
-            revert StalePrice();
+            revert IncompleteRound();
         }
 
         price = uint256(answer);
