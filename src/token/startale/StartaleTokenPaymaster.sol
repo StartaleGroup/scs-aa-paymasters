@@ -108,12 +108,13 @@ contract StartaleTokenPaymaster is
             revert InvalidTokenFeesTreasury();
         }
         tokenFeesTreasury = _tokenFeesTreasury;
+        emit TokenFeesTreasuryChanged(address(0), _tokenFeesTreasury);
 
         if (_unaccountedGas > UNACCOUNTED_GAS_LIMIT) {
             revert UnaccountedGasTooHigh();
         }
         unaccountedGas = _unaccountedGas;
-
+        emit UnaccountedGasChanged(0, _unaccountedGas);
         for (uint256 i = 0; i < _independentTokens.length; i++) {
             _addSupportedToken(_independentTokens[i], _feeMarkupsForIndependentTokens[i], _tokenOracleConfigs[i]);
         }
@@ -132,7 +133,9 @@ contract StartaleTokenPaymaster is
         if (_value > UNACCOUNTED_GAS_LIMIT) {
             revert UnaccountedGasTooHigh();
         }
+        uint256 oldUnaccountedGas = unaccountedGas;
         unaccountedGas = _value;
+        emit UnaccountedGasChanged(oldUnaccountedGas, _value);
     }
 
     /**
@@ -143,7 +146,9 @@ contract StartaleTokenPaymaster is
         if (_tokenFeesTreasury == address(0)) {
             revert InvalidTokenFeesTreasury();
         }
+        address oldTokenFeesTreasury = tokenFeesTreasury;
         tokenFeesTreasury = _tokenFeesTreasury;
+        emit TokenFeesTreasuryChanged(oldTokenFeesTreasury, _tokenFeesTreasury);
     }
 
     /**

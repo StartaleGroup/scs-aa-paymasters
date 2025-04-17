@@ -56,7 +56,7 @@ abstract contract MultiSigners {
             }
 
             signers[_initialSigners[i]] = true;
-
+            emit SignerAdded(_initialSigners[i]);
             unchecked {
                 ++i;
             }

@@ -75,6 +75,20 @@ interface IStartaleTokenPaymasterEventsAndErrors {
         address indexed user, address indexed token, uint256 tokenCharge, uint48 appliedMarkup, uint256 exchangeRate
     );
 
+    /**
+     * @notice Emitted when the token fees treasury is changed
+     * @param oldTokenFeesTreasury The previous token fees treasury
+     * @param newTokenFeesTreasury The new token fees treasury
+     */
+    event TokenFeesTreasuryChanged(address indexed oldTokenFeesTreasury, address indexed newTokenFeesTreasury);
+
+    /**
+     * @notice Emitted when the unaccounted gas value is changed
+     * @param oldUnaccountedGas The previous unaccounted gas value
+     * @param newUnaccountedGas The new unaccounted gas value
+     */
+    event UnaccountedGasChanged(uint256 oldUnaccountedGas, uint256 newUnaccountedGas);
+
     // Errors
 
     /**

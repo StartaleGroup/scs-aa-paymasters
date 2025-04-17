@@ -80,6 +80,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         minDeposit = _minDeposit;
         sponsorWithdrawalDelay = _withdrawalDelay;
         unaccountedGas = _unaccountedGas;
+        emit UnaccountedGasChanged(0, _unaccountedGas);
     }
 
     /**
@@ -164,7 +165,9 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
             // 1 day
             revert WithdrawalDelayTooLong();
         }
+        uint256 oldWithdrawalDelay = sponsorWithdrawalDelay;
         sponsorWithdrawalDelay = _newWithdrawalDelay;
+        emit WithdrawalDelayChanged(oldWithdrawalDelay, _newWithdrawalDelay);
     }
 
     /**

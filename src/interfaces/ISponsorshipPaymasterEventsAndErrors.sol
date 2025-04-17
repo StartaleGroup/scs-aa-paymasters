@@ -218,4 +218,11 @@ interface ISponsorshipPaymasterEventsAndErrors {
      * @param sponsorAccount The address of the sponsor who cancelled the withdrawal request
      */
     event WithdrawalRequestCancelledFor(address sponsorAccount);
+
+    /**
+     * @notice Emitted when the withdrawal delay is changed
+     * @param oldWithdrawalDelay The previous withdrawal delay
+     * @param newWithdrawalDelay The new withdrawal delay
+     */
+    event WithdrawalDelayChanged(uint256 oldWithdrawalDelay, uint256 newWithdrawalDelay);
 }
