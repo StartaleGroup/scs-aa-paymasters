@@ -191,6 +191,14 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
     }
 
     /**
+     * @dev Cancel a withdrawal request
+     */
+    function cancelWithdrawal() external {
+        delete withdrawalRequests[msg.sender];
+        emit WithdrawalRequestCancelledFor(msg.sender);
+    }
+
+    /**
      * @notice Sets a new fee collector address
      * @param _newFeeCollector The new fee collector address
      */

@@ -212,4 +212,10 @@ interface ISponsorshipPaymasterEventsAndErrors {
      * @param amount The amount of tokens withdrawn
      */
     event TokensWithdrawn(address indexed token, address indexed to, address indexed actor, uint256 amount);
+
+    /**
+     * @notice Emitted when a withdrawal request is cancelled
+     * @param sponsorAccount The address of the sponsor who cancelled the withdrawal request
+     */
+    event WithdrawalRequestCancelledFor(address sponsorAccount);
 }
