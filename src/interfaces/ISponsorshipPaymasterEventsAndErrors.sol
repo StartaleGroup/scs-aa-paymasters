@@ -120,6 +120,14 @@ interface ISponsorshipPaymasterEventsAndErrors {
      */
     error PotentiallyMalformedSignature();
 
+    /**
+     * @notice Error thrown when a user has insufficient funds for a withdrawal
+     * @param balance The user's current balance
+     * @param amount The amount requested for withdrawal
+     * @param minDeposit current minimum deposit
+     */
+    error RequiredToWithdrawFullBalanceOrKeepMinDeposit(uint256 balance, uint256 amount, uint256 minDeposit);
+
     // Events
 
     /**

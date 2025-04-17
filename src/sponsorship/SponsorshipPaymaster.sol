@@ -131,6 +131,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
      * @param _amount The amount of ETH the user wishes to withdraw
      */
     function requestWithdrawal(address _withdrawAddress, uint256 _amount) external {
+        uint256 currentBalance = sponsorBalances[msg.sender];
         // check zero address for withdrawal
         if (_withdrawAddress == address(0)) {
             revert InvalidWithdrawalAddress();
@@ -139,8 +140,15 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         if (_amount == 0) {
             revert CanNotWithdrawZeroAmount();
         }
-        if (sponsorBalances[msg.sender] < _amount) {
-            revert InsufficientFunds(msg.sender, sponsorBalances[msg.sender], _amount);
+        if (currentBalance < _amount) {
+            revert InsufficientFunds(msg.sender, currentBalance, _amount);
+        }
+        uint256 balanceAfterWithdrawal = currentBalance - _amount;
+        /// notice: have to display this on front end.
+        /// applies to fee collector as well.
+        /// toggle to withdraw full instead of manually entering amount.
+        if (balanceAfterWithdrawal != 0 && balanceAfterWithdrawal < minDeposit) {
+            revert RequiredToWithdrawFullBalanceOrKeepMinDeposit(currentBalance, _amount, minDeposit);
         }
         withdrawalRequests[msg.sender] =
             WithdrawalRequest({amount: _amount, to: _withdrawAddress, requestSubmittedTimestamp: block.timestamp});
