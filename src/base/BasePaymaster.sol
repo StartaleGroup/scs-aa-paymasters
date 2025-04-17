@@ -27,6 +27,12 @@ abstract contract BasePaymaster is IPaymaster, SoladyOwnable {
     /// @dev Offset to paymaster data in the UserOperation
     uint256 internal constant PAYMASTER_DATA_OFFSET = UserOperationLib.PAYMASTER_DATA_OFFSET;
 
+    /// @dev Error for when one-step ownership transfer is not allowed
+    error OneStepOwnershipTransferNotAllowed();
+
+    /// @dev Error for when renounceOwnership is not allowed
+    error RenounceOwnershipIsNotValid();
+
     /**
      * @notice Initializes the BasePaymaster with owner and EntryPoint
      * @param _ownerArg The address that will own the paymaster
@@ -191,5 +197,16 @@ abstract contract BasePaymaster is IPaymaster, SoladyOwnable {
             size := extcodesize(_addr)
         }
         return size > 0;
+    }
+
+    /// Disallow one-step ownership transfer
+    function transferOwnership(address newOwner) public payable override onlyOwner {
+        (newOwner);
+        revert OneStepOwnershipTransferNotAllowed();
+    }
+
+    /// Disallow renounceOwnership
+    function renounceOwnership() public payable override onlyOwner {
+        revert RenounceOwnershipIsNotValid();
     }
 }
