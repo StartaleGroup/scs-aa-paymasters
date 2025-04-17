@@ -424,10 +424,11 @@ contract StartaleTokenPaymaster is
         // Include unaccountedGas since EP doesn't include this in actualGasCost
         // unaccountedGas = postOpGas + EP overhead gas
         uint256 adjustedGasCost = _actualGasCost + ((unaccountedGas + expectedPenaltyGas) * _actualUserOpFeePerGas);
-        adjustedGasCost = (adjustedGasCost * appliedFeeMarkup) / FEE_MARKUP_DENOMINATOR;
+        adjustedGasCost = (adjustedGasCost * appliedFeeMarkup + FEE_MARKUP_DENOMINATOR - 1) / FEE_MARKUP_DENOMINATOR;
 
         // There is no preCharged amount so we can go ahead and transfer the token now
-        uint256 tokenAmount = (adjustedGasCost * exchangeRate) / (10 ** nativeOracleConfig.nativeAssetDecimals);
+        uint256 tokenAmount = (adjustedGasCost * exchangeRate + (10 ** nativeOracleConfig.nativeAssetDecimals) - 1)
+            / (10 ** nativeOracleConfig.nativeAssetDecimals);
 
         if (SafeTransferLib.trySafeTransferFrom(tokenAddress, sender, tokenFeesTreasury, tokenAmount)) {
             emit PaidGasInTokens(sender, tokenAddress, tokenAmount, appliedFeeMarkup, exchangeRate);

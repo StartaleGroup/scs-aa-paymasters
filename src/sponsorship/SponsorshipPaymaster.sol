@@ -460,8 +460,10 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         }
 
         // Calculate effective cost including unaccountedGas and feeMarkup
-        uint256 effectiveCost =
-            ((_requiredPreFund + (unaccountedGas * _userOp.unpackMaxFeePerGas())) * feeMarkup) / FEE_MARKUP_DENOMINATOR;
+        uint256 effectiveCost = (
+            ((_requiredPreFund + (unaccountedGas * _userOp.unpackMaxFeePerGas())) * feeMarkup) + FEE_MARKUP_DENOMINATOR
+                - 1
+        ) / FEE_MARKUP_DENOMINATOR;
 
         // Ensure the paymaster can cover the effective cost + max penalty
         if (effectiveCost > sponsorBalances[sponsorAccount]) {
@@ -518,7 +520,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         // unaccountedGas = postOpGas + EP overhead gas
         _actualGasCost = _actualGasCost + ((unaccountedGas + expectedPenaltyGas) * _actualUserOpFeePerGas);
 
-        uint256 adjustedGasCost = (_actualGasCost * feeMarkup) / FEE_MARKUP_DENOMINATOR;
+        uint256 adjustedGasCost = (_actualGasCost * feeMarkup + FEE_MARKUP_DENOMINATOR - 1) / FEE_MARKUP_DENOMINATOR;
         uint256 premium = adjustedGasCost - _actualGasCost;
         sponsorBalances[feeCollector] += premium;
 
