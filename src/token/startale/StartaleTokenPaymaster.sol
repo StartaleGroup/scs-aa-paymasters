@@ -55,6 +55,12 @@ contract StartaleTokenPaymaster is
     /// @notice Gas amount not accounted for in calculations
     uint256 public unaccountedGas;
 
+    /// @notice Allowlist of bundlers to use if restricting bundlers is enabled
+    mapping(address bundler => bool allowed) public isBundlerAllowed;
+
+    /// @notice Whether to allow all bundlers or not
+    bool public allowAllBundlers;
+
     /// @notice Mapping for independent tokens to their activated state and fee markup
     /// @dev The actual information on token oracle config is stored in the parent contract(OracleHelper) in a different mapping
     mapping(address => TokenConfig) private tokenConfigs;
@@ -121,6 +127,7 @@ contract StartaleTokenPaymaster is
         for (uint256 i = 0; i < _independentTokens.length; i++) {
             _addSupportedToken(_independentTokens[i], _feeMarkupsForIndependentTokens[i], _tokenOracleConfigs[i]);
         }
+        allowAllBundlers = true;
     }
 
     // No receive/fallback functions in this contract
@@ -275,6 +282,25 @@ contract StartaleTokenPaymaster is
 
         tokenConfigs[_token].feeMarkup = _newFeeMarkup;
         emit TokenFeeMarkupUpdated(_token, _newFeeMarkup);
+    }
+
+    /// @notice Add or remove multiple bundlers to/from the allowlist
+    /// @param bundlers Array of bundler addresses
+    /// @param allowed Boolean indicating if bundlers should be allowed or not
+    function updateBundlerAllowlist(address[] calldata bundlers, bool allowed) external onlyOwner {
+        for (uint256 i = 0; i < bundlers.length; i++) {
+            isBundlerAllowed[bundlers[i]] = allowed;
+            emit BundlerAllowlistUpdated(bundlers[i], allowed);
+        }
+    }
+
+    /**
+     * @notice Sets whether to allow all bundlers or not
+     * @notice If true, all bundlers will be allowed regardless of the allowlist. Default is true
+     * @param _allowAllBundlers Boolean indicating if all bundlers should be allowed
+     */
+    function allowAllBundlersYesOrNo(bool _allowAllBundlers) external onlyOwner {
+        allowAllBundlers = _allowAllBundlers;
     }
 
     // External view/pure functions
@@ -468,6 +494,10 @@ contract StartaleTokenPaymaster is
         // Ensure the postOp gas limit is not too low
         if (unaccountedGas > _userOp.unpackPostOpGasLimit()) {
             revert PostOpGasLimitTooLow();
+        }
+
+        if (!allowAllBundlers && !isBundlerAllowed[tx.origin]) {
+            revert BundlerNotAllowed(tx.origin);
         }
 
         // Save state to help calculate the expected penalty during postOp

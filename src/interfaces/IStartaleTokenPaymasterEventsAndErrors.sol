@@ -89,6 +89,12 @@ interface IStartaleTokenPaymasterEventsAndErrors {
      */
     event UnaccountedGasChanged(uint256 oldUnaccountedGas, uint256 newUnaccountedGas);
 
+    /// @notice Event for changing a bundler allowlist configuration
+    ///
+    /// @param bundler Address of the bundler
+    /// @param allowed True if was allowlisted, false if removed from allowlist
+    event BundlerAllowlistUpdated(address bundler, bool allowed);
+
     // Errors
 
     /**
@@ -193,4 +199,10 @@ interface IStartaleTokenPaymasterEventsAndErrors {
      * @notice Error thrown when a potentially malformed signature is detected
      */
     error PotentiallyMalformedSignature();
+
+    /**
+     * @notice Error thrown when a bundler is not allowed
+     * @param bundler The address of the bundler that is not allowed
+     */
+    error BundlerNotAllowed(address bundler);
 }
