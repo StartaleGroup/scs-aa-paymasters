@@ -174,4 +174,9 @@ interface IStartaleTokenPaymasterEventsAndErrors {
      * @param tokenAddress The address of the token with the invalid exchange rate
      */
     error InvalidExchangeRate(address tokenAddress);
+
+    /**
+     * @notice Error thrown when a potentially malformed signature is detected
+     */
+    error PotentiallyMalformedSignature();
 }

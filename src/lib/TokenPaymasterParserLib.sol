@@ -14,7 +14,6 @@ library TokenPaymasterParserLib {
     /// @dev Start offset of mode in paymaster and data
     uint256 private constant PAYMASTER_MODE_OFFSET = UserOperationLib.PAYMASTER_DATA_OFFSET;
 
-
     error InvalidPaymasterData();
 
     /**

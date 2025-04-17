@@ -152,7 +152,8 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
      * @param _newWithdrawalDelay The new withdrawal delay in seconds
      */
     function setWithdrawalDelay(uint256 _newWithdrawalDelay) external onlyOwner {
-        if (_newWithdrawalDelay > 86400) { // 1 day
+        if (_newWithdrawalDelay > 86400) {
+            // 1 day
             revert WithdrawalDelayTooLong();
         }
         sponsorWithdrawalDelay = _newWithdrawalDelay;
@@ -421,10 +422,9 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
             )
         );
 
-        // STPM-10
-        // if (recoveredSigner == address(0)) {
-        //     revert PotentiallyMalformedSignature();
-        // }
+        if (recoveredSigner == address(0)) {
+            revert PotentiallyMalformedSignature();
+        }
 
         bool isValidSig = signers[recoveredSigner];
 

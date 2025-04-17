@@ -115,6 +115,11 @@ interface ISponsorshipPaymasterEventsAndErrors {
      */
     error WithdrawalDelayTooLong();
 
+    /**
+     * @notice Error thrown when a potentially malformed signature is detected
+     */
+    error PotentiallyMalformedSignature();
+
     // Events
 
     /**
