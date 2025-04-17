@@ -35,6 +35,9 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
     // Limit for unaccounted gas cost
     uint256 private constant UNACCOUNTED_GAS_LIMIT = 150_000;
 
+    // Penalty percentage for exceeding the execution gas limit
+    uint256 private constant PENALTY_PERCENT = 10;
+
     // paymasterData is sponsorAccount(20 bytes) + validUntil(6 bytes) + validAfter(6 bytes) + feeMarkup(4 bytes) + signature
 
     uint256 private constant SPONSOR_ACCOUNT_LENGTH = 20;
@@ -512,7 +515,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
 
         uint256 expectedPenaltyGas;
         if (executionGasLimit > executionGasUsed) {
-            expectedPenaltyGas = (executionGasLimit - executionGasUsed) * 10 / 100;
+            expectedPenaltyGas = (executionGasLimit - executionGasUsed) * PENALTY_PERCENT / 100;
         }
         // Review: could emit expected penalty gas
 
@@ -536,7 +539,6 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
             sponsorBalances[sponsorAccount] -= deduction;
         }
 
-        // Note: can emit the mode
         emit GasBalanceDeducted(sponsorAccount, _actualGasCost, premium, _mode);
     }
 

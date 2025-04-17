@@ -42,6 +42,9 @@ contract StartaleTokenPaymaster is
     /// @dev Maximum allowed fee markup
     uint256 private constant MAX_FEE_MARKUP = 2e6;
 
+    /// @dev Penalty percentage for exceeding the execution gas limit
+    uint256 private constant PENALTY_PERCENT = 10;
+
     /// @dev Limit for unaccounted gas cost
     uint256 private constant UNACCOUNTED_GAS_LIMIT = 150_000;
 
@@ -418,7 +421,7 @@ contract StartaleTokenPaymaster is
 
         uint256 expectedPenaltyGas;
         if (executionGasLimit > executionGasUsed) {
-            expectedPenaltyGas = (executionGasLimit - executionGasUsed) * 10 / 100;
+            expectedPenaltyGas = (executionGasLimit - executionGasUsed) * PENALTY_PERCENT / 100;
         }
 
         // Include unaccountedGas since EP doesn't include this in actualGasCost

@@ -175,16 +175,13 @@ abstract contract PriceOracleHelper {
      * @return price The latest price fetched from the Oracle
      */
     function fetchPrice(IOracle _oracle, uint48 _maxOracleRoundAge) internal view returns (uint256 price) {
-        (uint80 roundId, int256 answer,, uint256 updatedAt, uint80 answeredInRound) = _oracle.latestRoundData();
+        (, int256 answer,, uint256 updatedAt,) = _oracle.latestRoundData();
 
         if (answer <= 0) {
             revert PriceShouldBePositive();
         }
         if (updatedAt < block.timestamp - _maxOracleRoundAge) {
             revert StalePrice();
-        }
-        if (answeredInRound < roundId) {
-            revert IncompleteRound();
         }
 
         price = uint256(answer);

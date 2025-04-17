@@ -2,7 +2,6 @@
 pragma solidity ^0.8.28;
 
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 
 /**
  * @title MultiSigners
@@ -12,10 +11,10 @@ import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint
 abstract contract MultiSigners {
     // Events
     /// @notice Emitted when a signer is added
-    event SignerAdded(address signer);
+    event SignerAdded(address indexed signer);
 
     /// @notice Emitted when a signer is removed
-    event SignerRemoved(address signer);
+    event SignerRemoved(address indexed signer);
 
     // Custom errors
     /// @notice Error when no signers are provided during contract deployment
@@ -47,7 +46,7 @@ abstract contract MultiSigners {
             revert NoInitialSigners();
         }
 
-        for (uint256 i; i < length;) {
+        for (uint256 i; i < length; ++i) {
             if (_initialSigners[i] == address(0)) {
                 revert SignerAddressCannotBeZero();
             }
@@ -57,9 +56,6 @@ abstract contract MultiSigners {
 
             signers[_initialSigners[i]] = true;
             emit SignerAdded(_initialSigners[i]);
-            unchecked {
-                ++i;
-            }
         }
     }
 
@@ -79,7 +75,7 @@ abstract contract MultiSigners {
      * @dev Emits a SignerRemoved event
      * @param _signer Address of the signer to remove
      */
-    function _removeSigner(address _signer) internal virtual {
+    function _removeSigner(address _signer) internal {
         if (!signers[_signer]) {
             revert SignerNotAdded(_signer);
         }
@@ -92,7 +88,7 @@ abstract contract MultiSigners {
      * @dev Validates the signer address and emits a SignerAdded event
      * @param _signer Address of the signer to add
      */
-    function _addSigner(address _signer) internal virtual {
+    function _addSigner(address _signer) internal {
         if (signers[_signer]) {
             revert SignerAlreadyAdded(_signer);
         }
