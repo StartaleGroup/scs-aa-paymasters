@@ -561,7 +561,7 @@ contract TestSponsorshipPaymaster is TestBase {
 
         sponsorshipPaymaster.depositFor{value: 10 ether}(SPONSOR_ACCOUNT.addr);
         startPrank(PAYMASTER_OWNER.addr);
-        sponsorshipPaymaster.setUnaccountedGas(15_000);
+        sponsorshipPaymaster.setUnaccountedGas(14_000);
         stopPrank();
 
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
@@ -577,9 +577,7 @@ contract TestSponsorshipPaymaster is TestBase {
 
         // submit userops
         vm.expectEmit(true, false, false, false, address(sponsorshipPaymaster));
-        emit ISponsorshipPaymasterEventsAndErrors.GasBalanceDeducted(
-            SPONSOR_ACCOUNT.addr, 0, 0, IPaymaster.PostOpMode.opSucceeded
-        );
+        emit ISponsorshipPaymasterEventsAndErrors.GasBalanceDeducted(SPONSOR_ACCOUNT.addr, 0, 0);
         startPrank(BUNDLER.addr);
         ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
         stopPrank();
@@ -635,9 +633,7 @@ contract TestSponsorshipPaymaster is TestBase {
 
         // submit userops
         vm.expectEmit(true, false, false, false, address(sponsorshipPaymaster));
-        emit ISponsorshipPaymasterEventsAndErrors.GasBalanceDeducted(
-            SPONSOR_ACCOUNT.addr, 0, 0, IPaymaster.PostOpMode.opSucceeded
-        );
+        emit ISponsorshipPaymasterEventsAndErrors.GasBalanceDeducted(SPONSOR_ACCOUNT.addr, 0, 0);
         startPrank(BUNDLER.addr);
         ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
         stopPrank();

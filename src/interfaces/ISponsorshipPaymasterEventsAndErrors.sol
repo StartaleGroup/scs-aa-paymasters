@@ -131,13 +131,6 @@ interface ISponsorshipPaymasterEventsAndErrors {
     // Events
 
     /**
-     * @notice Emitted when a user operation is sponsored
-     * @param userOpHash The hash of the sponsored user operation
-     * @param user The address of the user whose operation is sponsored
-     */
-    event UserOperationSponsored(bytes32 indexed userOpHash, address indexed user);
-
-    /**
      * @notice Emitted when a user adds a deposit
      * @param user The address that added the deposit
      * @param amount The amount deposited
@@ -149,9 +142,8 @@ interface ISponsorshipPaymasterEventsAndErrors {
      * @param user The sponsor address
      * @param amount The amount of gas cost deducted
      * @param premium The premium amount (markup) applied
-     * @param mode The post-operation mode
      */
-    event GasBalanceDeducted(address indexed user, uint256 amount, uint256 premium, IPaymaster.PostOpMode mode);
+    event GasBalanceDeducted(address indexed user, uint256 amount, uint256 premium);
 
     /**
      * @notice Emitted when a withdrawal request is submitted

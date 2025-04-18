@@ -14,7 +14,7 @@ import {ISponsorshipPaymaster} from "../interfaces/ISponsorshipPaymaster.sol";
 import {MultiSigners} from "../lib/MultiSigners.sol";
 
 /**
- * @title SponsorshipPaymaster
+ * @title self-funded SponsorshipPaymaster
  * @notice Paymaster contract that enables transaction sponsorship for account abstraction
  * @dev Manages funds from sponsors to pay for user operations
  */
@@ -474,7 +474,6 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         }
 
         sponsorBalances[sponsorAccount] -= (effectiveCost);
-        emit UserOperationSponsored(_userOpHash, _userOp.getSender());
 
         // Save some state to help calculate the expected penalty during postOp
         uint256 preOpGasApproximation = _userOp.preVerificationGas + _userOp.unpackVerificationGasLimit()
@@ -498,6 +497,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         internal
         override
     {
+        (_mode);
         (
             address sponsorAccount,
             uint32 feeMarkup,
@@ -531,7 +531,6 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
             // Refund excess gas fees
             uint256 refund = prechargedAmount - adjustedGasCost;
             sponsorBalances[sponsorAccount] += refund;
-            // Review: whether to consider this for premium
             emit RefundProcessed(sponsorAccount, refund);
         } else {
             // Handle undercharge scenario
@@ -539,7 +538,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
             sponsorBalances[sponsorAccount] -= deduction;
         }
 
-        emit GasBalanceDeducted(sponsorAccount, _actualGasCost, premium, _mode);
+        emit GasBalanceDeducted(sponsorAccount, adjustedGasCost, premium);
     }
 
     /**
