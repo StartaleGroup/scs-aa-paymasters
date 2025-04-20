@@ -3,7 +3,6 @@ pragma solidity ^0.8.28;
 
 import {IPaymaster} from "@account-abstraction/contracts/interfaces/IPaymaster.sol";
 
-
 /**
  * @title IStartaleManagedPaymasterEventsAndErrors
  * @notice Interface defining events and errors for the StartaleManagedPaymaster
@@ -24,20 +23,17 @@ interface IStartaleManagedPaymasterEventsAndErrors {
      */
     error PotentiallyMalformedSignature();
 
-
     /**
      * @notice Error thrown when the withdrawal address is invalid
      * @dev The address cannot be the zero address
      */
     error InvalidWithdrawalAddress();
 
-
     /**
      * @notice Error thrown when the withdrawal fails
      * @dev The withdrawal cannot be completed
      */
     error WithdrawalFailed();
-
 
     // Events
 

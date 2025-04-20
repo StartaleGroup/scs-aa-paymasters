@@ -39,7 +39,6 @@ interface IStartaleManagedPaymaster is IStartaleManagedPaymasterEventsAndErrors 
      */
     function withdrawEth(address payable _recipient, uint256 _amount) external payable;
 
-
     /**
      * @notice Generates a hash of the given UserOperation to be signed by the paymaster
      * @param _userOp The UserOperation structure
@@ -47,11 +46,10 @@ interface IStartaleManagedPaymaster is IStartaleManagedPaymasterEventsAndErrors 
      * @param _validAfter The timestamp after which the operation is valid
      * @return The hashed UserOperation data
      */
-    function getHash(
-        PackedUserOperation calldata _userOp,
-        uint48 _validUntil,
-        uint48 _validAfter
-    ) external view returns (bytes32);
+    function getHash(PackedUserOperation calldata _userOp, uint48 _validUntil, uint48 _validAfter)
+        external
+        view
+        returns (bytes32);
 
     /**
      * @notice Parses the paymaster data to extract relevant information
@@ -63,9 +61,5 @@ interface IStartaleManagedPaymaster is IStartaleManagedPaymasterEventsAndErrors 
     function parsePaymasterAndData(bytes calldata _paymasterAndData)
         external
         pure
-        returns (
-            uint48 validUntil,
-            uint48 validAfter,
-            bytes calldata signature
-        );
+        returns (uint48 validUntil, uint48 validAfter, bytes calldata signature);
 }

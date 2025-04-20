@@ -13,7 +13,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MultiSigners} from "../lib/MultiSigners.sol";
 import {IStartaleManagedPaymaster} from "../interfaces/IStartaleManagedPaymaster.sol";
 
-contract StartaleManagedPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTransient, IStartaleManagedPaymaster {
+contract StartaleManagedPaymaster is
+    BasePaymaster,
+    MultiSigners,
+    ReentrancyGuardTransient,
+    IStartaleManagedPaymaster
+{
     using UserOperationLib for PackedUserOperation;
     using SignatureCheckerLib for address;
     using ECDSA_solady for bytes32;
@@ -28,7 +33,7 @@ contract StartaleManagedPaymaster is BasePaymaster, MultiSigners, ReentrancyGuar
 
     // paymasterData validUntil(6 bytes) + validAfter(6 bytes) + signature
 
-    event UserOperationSponsored(bytes32 indexed userOpHash,address indexed user);
+    event UserOperationSponsored(bytes32 indexed userOpHash, address indexed user);
 
     /**
      * @notice Initializes the SponsorshipPaymaster contract
@@ -36,12 +41,10 @@ contract StartaleManagedPaymaster is BasePaymaster, MultiSigners, ReentrancyGuar
      * @param _entryPoint The ERC-4337 EntryPoint contract address
      * @param _signers Array of authorized signers for paymaster validation
      */
-    constructor(
-        address _owner,
-        address _entryPoint,
-        address[] memory _signers
-    ) BasePaymaster(_owner, IEntryPoint(_entryPoint)) MultiSigners(_signers) {
-    }
+    constructor(address _owner, address _entryPoint, address[] memory _signers)
+        BasePaymaster(_owner, IEntryPoint(_entryPoint))
+        MultiSigners(_signers)
+    {}
 
     /**
      * @notice Receives ETH payments
@@ -102,18 +105,20 @@ contract StartaleManagedPaymaster is BasePaymaster, MultiSigners, ReentrancyGuar
      * which will carry the signature itself.
      */
     function getHash(PackedUserOperation calldata userOp, uint48 validUntil, uint48 validAfter)
-    public view returns (bytes32) {
+        public
+        view
+        returns (bytes32)
+    {
         //can't use userOp.hash(), since it contains also the paymasterAndData itself.
         address sender = userOp.getSender();
-        return
-            keccak256(
+        return keccak256(
             abi.encode(
                 sender,
                 userOp.nonce,
                 keccak256(userOp.initCode),
                 keccak256(userOp.callData),
                 userOp.accountGasLimits,
-                uint256(bytes32(userOp.paymasterAndData[PAYMASTER_VALIDATION_GAS_OFFSET : PAYMASTER_DATA_OFFSET])),
+                uint256(bytes32(userOp.paymasterAndData[PAYMASTER_VALIDATION_GAS_OFFSET:PAYMASTER_DATA_OFFSET])),
                 userOp.preVerificationGas,
                 userOp.gasFees,
                 block.chainid,
@@ -134,18 +139,15 @@ contract StartaleManagedPaymaster is BasePaymaster, MultiSigners, ReentrancyGuar
         bytes32 userOpHash,
         uint256 /*_requiredPreFund*/
     ) internal override returns (bytes memory, uint256) {
-
-        (uint48 validUntil, uint48 validAfter, bytes calldata signature) = parsePaymasterAndData(_userOp.paymasterAndData);
+        (uint48 validUntil, uint48 validAfter, bytes calldata signature) =
+            parsePaymasterAndData(_userOp.paymasterAndData);
 
         if (signature.length != 64 && signature.length != 65) {
             revert PaymasterSignatureLengthInvalid();
         }
 
-        address recoveredSigner = (
-            (getHash(_userOp, validUntil, validAfter).toEthSignedMessageHash()).tryRecover(
-                signature
-            )
-        );
+        address recoveredSigner =
+            ((getHash(_userOp, validUntil, validAfter).toEthSignedMessageHash()).tryRecover(signature));
 
         if (recoveredSigner == address(0)) {
             revert PotentiallyMalformedSignature();
@@ -160,9 +162,13 @@ contract StartaleManagedPaymaster is BasePaymaster, MultiSigners, ReentrancyGuar
         return ("", _packValidationData(!isValidSig, validUntil, validAfter));
     }
 
-    function parsePaymasterAndData(bytes calldata paymasterAndData) public pure returns (uint48 validUntil, uint48 validAfter, bytes calldata signature) {
-        (validUntil, validAfter) = abi.decode(paymasterAndData[VALID_TIMESTAMP_OFFSET :], (uint48, uint48));
-        signature = paymasterAndData[SIGNATURE_OFFSET :];
+    function parsePaymasterAndData(bytes calldata paymasterAndData)
+        public
+        pure
+        returns (uint48 validUntil, uint48 validAfter, bytes calldata signature)
+    {
+        (validUntil, validAfter) = abi.decode(paymasterAndData[VALID_TIMESTAMP_OFFSET:], (uint48, uint48));
+        signature = paymasterAndData[SIGNATURE_OFFSET:];
     }
 
     /**
