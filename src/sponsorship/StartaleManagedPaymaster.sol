@@ -18,9 +18,15 @@ contract StartaleManagedPaymaster is BasePaymaster, MultiSigners, ReentrancyGuar
     using SignatureCheckerLib for address;
     using ECDSA_solady for bytes32;
 
-    uint256 private constant VALID_TIMESTAMP_OFFSET = PAYMASTER_DATA_OFFSET;
+    // paymasterData part of userOp.paymasterAndData starts here
+    // userOp.paymasterAndData is paymaster address(20 bytes) + paymaster validation gas limit(16 bytes) + paymaster post-op gas limit(16 bytes) + paymasterData
+    // where + means concat
 
-    uint256 private constant SIGNATURE_OFFSET = VALID_TIMESTAMP_OFFSET + 64;
+    uint256 private constant VALID_TIMESTAMP_OFFSET = PAYMASTER_DATA_OFFSET; // 52
+
+    uint256 private constant SIGNATURE_OFFSET = VALID_TIMESTAMP_OFFSET + 64; //52 + 12
+
+    // paymasterData validUntil(6 bytes) + validAfter(6 bytes) + signature
 
     event UserOperationSponsored(bytes32 indexed userOpHash,address indexed user);
 
@@ -148,7 +154,7 @@ contract StartaleManagedPaymaster is BasePaymaster, MultiSigners, ReentrancyGuar
         bool isValidSig = signers[recoveredSigner];
 
         // Review: If we need to emit additional details
-        // We could potentially get project specific details (signed/unsigned) from the paymasterAndData
+        // We could potentially get project specific details  from the paymasterAndData
         emit UserOperationSponsored(userOpHash, _userOp.getSender());
 
         return ("", _packValidationData(!isValidSig, validUntil, validAfter));
