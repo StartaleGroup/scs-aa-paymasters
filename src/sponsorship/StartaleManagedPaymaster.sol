@@ -13,6 +13,15 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MultiSigners} from "../lib/MultiSigners.sol";
 import {IStartaleManagedPaymaster} from "../interfaces/IStartaleManagedPaymaster.sol";
 
+
+/**
+ * @title StartaleManagedPaymaster
+ * @notice Paymaster contract that enables transaction sponsorship for account abstraction
+ * @dev uses external service to decide whether to pay for the UserOp. 
+ * @dev The paymaster trusts an external signers to sign the transaction.
+ * @notice Accounting is done off-chain and billed to the projects in a post-paid manner.
+ * @notice Startale is responsible for deposting gas on the paymaster contract.
+ */
 contract StartaleManagedPaymaster is
     BasePaymaster,
     MultiSigners,
