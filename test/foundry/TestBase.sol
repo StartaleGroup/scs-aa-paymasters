@@ -18,6 +18,7 @@ import {IPaymaster} from "account-abstraction/interfaces/IPaymaster.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {SponsorshipPaymaster} from "../../src/sponsorship/SponsorshipPaymaster.sol";
+import {StartaleManagedPaymaster} from "../../src/sponsorship/StartaleManagedPaymaster.sol";
 import {BaseEventsAndErrors} from "./BaseEventsAndErrors.sol";
 import {IOracleHelper} from "../../src/interfaces/IOracleHelper.sol";
 import {StartaleTokenPaymaster} from "../../src/token/startale/StartaleTokenPaymaster.sol";
@@ -51,6 +52,13 @@ abstract contract TestBase is CheatCodes, TestHelper, BaseEventsAndErrors {
         uint48 validUntil;
         uint48 validAfter;
         uint32 feeMarkup;
+    }
+
+    struct StartaleManagedPaymasterData {
+        uint128 validationGasLimit;
+        uint128 postOpGasLimit;
+        uint48 validUntil;
+        uint48 validAfter;
     }
 
     struct TokenPaymasterDataExternalMode {
@@ -200,6 +208,36 @@ abstract contract TestBase is CheatCodes, TestHelper, BaseEventsAndErrors {
         userOpHash = ENTRYPOINT.getUserOpHash(userOp);
     }
 
+    function createUserOpWithStartaleManagedPaymaster(
+        Vm.Wallet memory sender,
+        StartaleManagedPaymaster paymaster,
+        uint128 postOpGasLimitOverride
+    ) internal view returns (PackedUserOperation memory userOp, bytes32 userOpHash) {
+        // Create userOp with no gas estimates
+        userOp = buildUserOpWithCalldata(sender, "", 0, 0);
+
+        StartaleManagedPaymasterData memory pmData = StartaleManagedPaymasterData({
+            validationGasLimit: 100_000,
+            postOpGasLimit: uint128(postOpGasLimitOverride),
+            validUntil: uint48(block.timestamp + 1 days),
+            validAfter: uint48(block.timestamp)
+        });
+        (userOp.paymasterAndData,) =
+            generateAndSignStartaleManagedPaymasterData(userOp, PAYMASTER_SIGNER_A, paymaster, pmData);
+        userOp.signature = signUserOp(sender, userOp);
+
+        // Ammend the userop to have updated / overridden gas limits
+        userOp.accountGasLimits = bytes32(abi.encodePacked(uint128(100_000), uint128(0)));
+        StartaleManagedPaymasterData memory pmDataNew = StartaleManagedPaymasterData(
+            uint128(100_000), uint128(postOpGasLimitOverride), uint48(block.timestamp + 1 days), uint48(block.timestamp)
+        );
+
+        (userOp.paymasterAndData,) =
+            generateAndSignStartaleManagedPaymasterData(userOp, PAYMASTER_SIGNER_A, paymaster, pmDataNew);
+        userOp.signature = signUserOp(sender, userOp);
+        userOpHash = ENTRYPOINT.getUserOpHash(userOp);
+    }
+
     function createUserOpWithTokenPaymasterAndExternalMode(
         Vm.Wallet memory sender,
         StartaleTokenPaymaster paymaster,
@@ -297,6 +335,48 @@ abstract contract TestBase is CheatCodes, TestHelper, BaseEventsAndErrors {
             pmData.validUntil,
             pmData.validAfter,
             pmData.feeMarkup,
+            signature
+        );
+    }
+
+    /// @notice Generates and signs the paymaster data for a user operation.
+    /// @dev This function prepares the `paymasterAndData` field for a `PackedUserOperation` with the correct signature.
+    /// @param userOp The user operation to be signed.
+    /// @param signer The wallet that will sign the paymaster hash.
+    /// @param paymaster The paymaster contract.
+    /// @return finalPmData Full Pm Data.
+    /// @return signature  Pm Signature on Data.
+    function generateAndSignStartaleManagedPaymasterData(
+        PackedUserOperation memory userOp,
+        Vm.Wallet memory signer,
+        StartaleManagedPaymaster paymaster,
+        StartaleManagedPaymasterData memory pmData
+    ) internal view returns (bytes memory finalPmData, bytes memory signature) {
+        // Initial paymaster data with zero signature
+        userOp.paymasterAndData = abi.encodePacked(
+            address(paymaster),
+            pmData.validationGasLimit,
+            pmData.postOpGasLimit,
+            pmData.validUntil,
+            pmData.validAfter,
+            new bytes(65) // Zero signature
+        );
+
+        {
+            // Generate hash to be signed
+            bytes32 paymasterHash = paymaster.getHash(userOp, pmData.validUntil, pmData.validAfter);
+
+            // Sign the hash
+            signature = signMessage(signer, paymasterHash);
+        }
+
+        // Final paymaster data with the actual signature
+        finalPmData = abi.encodePacked(
+            address(paymaster),
+            pmData.validationGasLimit,
+            pmData.postOpGasLimit,
+            pmData.validUntil,
+            pmData.validAfter,
             signature
         );
     }

@@ -36,8 +36,10 @@ contract StartaleManagedPaymaster is
     // where + means concat
 
     uint256 private constant VALID_TIMESTAMP_OFFSET = PAYMASTER_DATA_OFFSET; // 52
-
-    uint256 private constant SIGNATURE_OFFSET = VALID_TIMESTAMP_OFFSET + 64; //52 + 12
+    uint256 private constant TIMESTAMP_DATA_LENGTH = 6;
+    uint256 private constant VALID_UNTIL_TIMESTAMP_OFFSET = VALID_TIMESTAMP_OFFSET;
+    uint256 private constant VALID_AFTER_TIMESTAMP_OFFSET = VALID_UNTIL_TIMESTAMP_OFFSET + TIMESTAMP_DATA_LENGTH;
+    uint256 private constant SIGNATURE_OFFSET = VALID_AFTER_TIMESTAMP_OFFSET + TIMESTAMP_DATA_LENGTH;
 
     // paymasterData validUntil(6 bytes) + validAfter(6 bytes) + signature
 
@@ -175,7 +177,8 @@ contract StartaleManagedPaymaster is
         pure
         returns (uint48 validUntil, uint48 validAfter, bytes calldata signature)
     {
-        (validUntil, validAfter) = abi.decode(paymasterAndData[VALID_TIMESTAMP_OFFSET:], (uint48, uint48));
+        validUntil = uint48(bytes6(paymasterAndData[VALID_UNTIL_TIMESTAMP_OFFSET:VALID_AFTER_TIMESTAMP_OFFSET]));
+        validAfter = uint48(bytes6(paymasterAndData[VALID_AFTER_TIMESTAMP_OFFSET:SIGNATURE_OFFSET]));
         signature = paymasterAndData[SIGNATURE_OFFSET:];
     }
 
