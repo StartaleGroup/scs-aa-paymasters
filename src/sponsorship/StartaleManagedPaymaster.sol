@@ -165,8 +165,6 @@ contract StartaleManagedPaymaster is
 
         bool isValidSig = signers[recoveredSigner];
 
-        // Review: If we need to emit additional details
-        // We could potentially get project specific details(signed/unsigned proj id etc) from the paymasterAndData
         emit UserOperationSponsored(userOpHash, _userOp.getSender());
 
         return ("", _packValidationData(!isValidSig, validUntil, validAfter));
