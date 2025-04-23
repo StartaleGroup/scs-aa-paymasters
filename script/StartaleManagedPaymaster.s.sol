@@ -28,15 +28,9 @@ contract DeployStartaleManagedPaymaster is Script {
         run(salt, owner, signersAddr);
     }
 
-    function run(
-        uint256 _salt,
-        address _owner,
-        address[] memory _signers
-    ) public {
+    function run(uint256 _salt, address _owner, address[] memory _signers) public {
         vm.startBroadcast();
-        StartaleManagedPaymaster pm = new StartaleManagedPaymaster{salt: bytes32(_salt)}(
-            _owner, entryPoint, _signers
-        );
+        StartaleManagedPaymaster pm = new StartaleManagedPaymaster{salt: bytes32(_salt)}(_owner, entryPoint, _signers);
         console.log("Startale Managed Paymaster Contract deployed at ", address(pm));
         vm.stopBroadcast();
     }
