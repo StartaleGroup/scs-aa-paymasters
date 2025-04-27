@@ -165,7 +165,9 @@ contract StartaleManagedPaymaster is
 
         bool isValidSig = signers[recoveredSigner];
 
-        emit UserOperationSponsored(userOpHash, _userOp.getSender());
+        if (isValidSig) {
+            emit UserOperationSponsored(userOpHash, _userOp.getSender());
+        }
 
         return ("", _packValidationData(!isValidSig, validUntil, validAfter));
     }
