@@ -263,8 +263,18 @@ contract StartaleTokenPaymaster is
      * @notice Updates the native asset to USD oracle
      * @param _newNativeAssetToUsdOracle The new native asset to USD oracle address
      */
-    function updateNativeAssetToUsdOracle(address _newNativeAssetToUsdOracle) external onlyOwner {
+    function updateNativeAssetToUsdOracle(
+        address _newNativeAssetToUsdOracle,
+        uint48 _nativeAssetMaxOracleRoundAge,
+        uint8 _nativeAssetDecimals
+    ) external onlyOwner {
         _updateNativeAssetToUsdOracle(_newNativeAssetToUsdOracle);
+        _updateNativeOracleConfig(
+            IOracleHelper.NativeOracleConfig({
+                maxOracleRoundAge: _nativeAssetMaxOracleRoundAge,
+                nativeAssetDecimals: _nativeAssetDecimals
+            })
+        );
     }
 
     /**
@@ -300,7 +310,11 @@ contract StartaleTokenPaymaster is
      * @param _allowAllBundlers Boolean indicating if all bundlers should be allowed
      */
     function allowAllBundlersYesOrNo(bool _allowAllBundlers) external onlyOwner {
-        allowAllBundlers = _allowAllBundlers;
+        // Only update and emit if there's an actual change
+        if (allowAllBundlers != _allowAllBundlers) {
+            allowAllBundlers = _allowAllBundlers;
+            emit AllowAllBundlersUpdated(_allowAllBundlers);
+        }
     }
 
     // External view/pure functions
@@ -430,16 +444,6 @@ contract StartaleTokenPaymaster is
 
         uint256 actualGas = _actualGasCost / _actualUserOpFeePerGas;
 
-        // If exchangeRate is 0, it means it was not set in the validatePaymasterUserOp => independent mode
-        // So we need to get the price of the token from the oracle now
-        if (exchangeRate == 0) {
-            exchangeRate = getExchangeRate(tokenAddress);
-            // if exchangeRate is still 0, it means the token is not supported or something went wrong
-            if (exchangeRate == 0) {
-                revert TokenPriceFeedErrored(tokenAddress);
-            }
-        }
-
         uint256 executionGasUsed;
         if (actualGas + unaccountedGas > preOpGasApproximation) {
             executionGasUsed = actualGas + unaccountedGas - preOpGasApproximation;
@@ -482,7 +486,7 @@ contract StartaleTokenPaymaster is
         bytes32 _userOpHash,
         uint256 _requiredPreFund
     ) internal view override returns (bytes memory, uint256) {
-        (_userOpHash, _requiredPreFund); // Unused parameters
+        (_userOpHash); // Unused parameters
 
         (PaymasterMode mode, bytes calldata modeSpecificData) = _userOp.paymasterAndData.parsePaymasterAndData();
 
@@ -496,9 +500,7 @@ contract StartaleTokenPaymaster is
             revert PostOpGasLimitTooLow();
         }
 
-        if (!allowAllBundlers && !isBundlerAllowed[tx.origin]) {
-            revert BundlerNotAllowed(tx.origin);
-        }
+        address smartAccount = _userOp.getSender();
 
         // Save state to help calculate the expected penalty during postOp
         uint256 preOpGasApproximation = _userOp.preVerificationGas + _userOp.unpackVerificationGasLimit()
@@ -507,6 +509,11 @@ contract StartaleTokenPaymaster is
         uint256 executionGasLimit = _userOp.unpackCallGasLimit() + _userOp.unpackPostOpGasLimit();
 
         if (mode == PaymasterMode.INDEPENDENT) {
+            // Check if bundler is allowed
+            if (!allowAllBundlers && !isBundlerAllowed[tx.origin]) {
+                revert BundlerNotAllowed(tx.origin);
+            }
+
             (address tokenAddress) = modeSpecificData.parseIndependentModeSpecificData();
             // Check length - it must be 20 bytes
             if (modeSpecificData.length != 20) {
@@ -520,14 +527,30 @@ contract StartaleTokenPaymaster is
 
             uint48 feeMarkup = getTokenFeeMarkup(tokenAddress);
 
+            // Calculate effective cost including unaccountedGas and feeMarkup
+            uint256 effectiveCost = (
+                ((_requiredPreFund + (unaccountedGas * _userOp.unpackMaxFeePerGas())) * feeMarkup)
+                    + FEE_MARKUP_DENOMINATOR - 1
+            ) / FEE_MARKUP_DENOMINATOR;
+
+            uint256 effectiveExchangeRate = getExchangeRate(tokenAddress);
+
+            if (effectiveExchangeRate == 0) {
+                revert TokenPriceFeedErrored(tokenAddress);
+            }
+
+            // There is no preCharged amount so we can go ahead and transfer the token now
+            uint256 tokenAmount = (
+                effectiveCost * effectiveExchangeRate + (10 ** nativeOracleConfig.nativeAssetDecimals) - 1
+            ) / (10 ** nativeOracleConfig.nativeAssetDecimals);
+
+            if (IERC20(tokenAddress).balanceOf(smartAccount) < tokenAmount) {
+                revert InsufficientERC20Balance();
+            }
+
             // Prepare context for postOp
             bytes memory context = abi.encode(
-                _userOp.sender,
-                tokenAddress,
-                preOpGasApproximation,
-                executionGasLimit,
-                uint256(0), // exchangeRate is zero in independent mode
-                feeMarkup
+                _userOp.sender, tokenAddress, preOpGasApproximation, executionGasLimit, effectiveExchangeRate, feeMarkup
             );
             uint256 validationData = _packValidationData(false, 0, 0);
             return (context, validationData);
@@ -553,6 +576,20 @@ contract StartaleTokenPaymaster is
             // Validate supplied markup is not greater than max markup
             if (appliedFeeMarkup > MAX_FEE_MARKUP) {
                 revert FeeMarkupTooHigh();
+            }
+
+            // Calculate effective cost including unaccountedGas and feeMarkup
+            uint256 effectiveCost = (
+                ((_requiredPreFund + (unaccountedGas * _userOp.unpackMaxFeePerGas())) * appliedFeeMarkup)
+                    + FEE_MARKUP_DENOMINATOR - 1
+            ) / FEE_MARKUP_DENOMINATOR;
+
+            // There is no preCharged amount so we can go ahead and transfer the token now
+            uint256 tokenAmount = (effectiveCost * exchangeRate + (10 ** nativeOracleConfig.nativeAssetDecimals) - 1)
+                / (10 ** nativeOracleConfig.nativeAssetDecimals);
+
+            if (IERC20(tokenAddress).balanceOf(smartAccount) < tokenAmount) {
+                revert InsufficientERC20Balance();
             }
 
             address recoveredSigner = (

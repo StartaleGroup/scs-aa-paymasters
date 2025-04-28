@@ -95,6 +95,12 @@ interface IStartaleTokenPaymasterEventsAndErrors {
     /// @param allowed True if was allowlisted, false if removed from allowlist
     event BundlerAllowlistUpdated(address bundler, bool allowed);
 
+    /**
+     * @notice Event for changing the bundler allowlist configuration
+     * @param allowed True if all bundlers are allowed, false if specific bundlers are allowed
+     */
+    event AllowAllBundlersUpdated(bool allowed);
+
     // Errors
 
     /**
@@ -205,4 +211,9 @@ interface IStartaleTokenPaymasterEventsAndErrors {
      * @param bundler The address of the bundler that is not allowed
      */
     error BundlerNotAllowed(address bundler);
+
+    /**
+     * @notice Error thrown when an insufficient ERC20 balance is detected in validation stage
+     */
+    error InsufficientERC20Balance();
 }

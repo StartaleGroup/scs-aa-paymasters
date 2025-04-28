@@ -12,6 +12,7 @@ import {TestCounter} from "../../TestCounter.sol";
 import {MockToken} from "../../mock/MockToken.sol";
 import {MockOracle} from "../../mock/MockOracle.sol";
 import {IOracle} from "../../../../src/interfaces/IOracle.sol";
+import {PriceOracleHelper} from "../../../../src/token/startale/PriceOracleHelper.sol";
 
 contract TestTokenPaymaster is TestBase {
     uint256 public constant WITHDRAWAL_DELAY = 3600;
@@ -335,7 +336,7 @@ contract TestTokenPaymaster is TestBase {
         testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
 
         vm.startPrank(PAYMASTER_OWNER.addr);
-        tokenPaymaster.setUnaccountedGas(40_000);
+        tokenPaymaster.setUnaccountedGas(20_000);
         vm.stopPrank();
 
         // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
@@ -411,7 +412,7 @@ contract TestTokenPaymaster is TestBase {
         testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
 
         vm.startPrank(PAYMASTER_OWNER.addr);
-        tokenPaymaster.setUnaccountedGas(40_000);
+        tokenPaymaster.setUnaccountedGas(20_000);
         tokenPaymaster.updateTokenFeeMarkup(address(testToken), 1.2e6);
         vm.stopPrank();
 
@@ -527,9 +528,14 @@ contract TestTokenPaymaster is TestBase {
         startPrank(BUNDLER.addr);
         uint256 gasValue = gasleft();
 
-        vm.expectEmit(false, false, false, false, ENTRYPOINT_ADDRESS);
-        // Review: can emit exact expected values and reason: StalePrice
-        emit IEntryPoint.PostOpRevertReason(userOpHash, address(0), 0, new bytes(0));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IEntryPoint.FailedOpWithRevert.selector,
+                0,
+                "AA33 reverted",
+                abi.encodeWithSelector(PriceOracleHelper.StalePrice.selector)
+            )
+        );
 
         ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
         gasValue = gasValue - gasleft();
@@ -615,10 +621,14 @@ contract TestTokenPaymaster is TestBase {
         startPrank(BUNDLER.addr);
         uint256 gasValue = gasleft();
 
-        vm.expectEmit(false, false, false, false, ENTRYPOINT_ADDRESS);
-        // Review: can emit exact expected values and reason: FailedToChargeTokens
-        /// @note: UserOp does not revert when the postOp reverts.
-        emit IEntryPoint.PostOpRevertReason(userOpHash, address(0), 0, new bytes(0));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IEntryPoint.FailedOpWithRevert.selector,
+                0,
+                "AA33 reverted",
+                abi.encodeWithSelector(IStartaleTokenPaymasterEventsAndErrors.InsufficientERC20Balance.selector)
+            )
+        );
 
         ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
         gasValue = gasValue - gasleft();
