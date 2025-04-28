@@ -211,4 +211,9 @@ interface IStartaleTokenPaymasterEventsAndErrors {
      * @param bundler The address of the bundler that is not allowed
      */
     error BundlerNotAllowed(address bundler);
+
+    /**
+     * @notice Error thrown when an insufficient ERC20 balance is detected in validation stage
+     */
+    error InsufficientERC20Balance();
 }
