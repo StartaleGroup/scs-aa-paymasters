@@ -263,8 +263,18 @@ contract StartaleTokenPaymaster is
      * @notice Updates the native asset to USD oracle
      * @param _newNativeAssetToUsdOracle The new native asset to USD oracle address
      */
-    function updateNativeAssetToUsdOracle(address _newNativeAssetToUsdOracle) external onlyOwner {
+    function updateNativeAssetToUsdOracle(
+        address _newNativeAssetToUsdOracle,
+        uint48 _nativeAssetMaxOracleRoundAge,
+        uint8 _nativeAssetDecimals
+    ) external onlyOwner {
         _updateNativeAssetToUsdOracle(_newNativeAssetToUsdOracle);
+        _updateNativeOracleConfig(
+            IOracleHelper.NativeOracleConfig({
+                maxOracleRoundAge: _nativeAssetMaxOracleRoundAge,
+                nativeAssetDecimals: _nativeAssetDecimals
+            })
+        );
     }
 
     /**
