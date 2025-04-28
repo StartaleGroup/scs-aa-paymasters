@@ -51,7 +51,7 @@ abstract contract PriceOracleHelper {
 
         nativeAssetToUsdOracle = IOracle(_nativeAssetToUsdOracle);
         sequencerUptimeOracle = IOracle(_sequencerUptimeOracle);
-        nativeOracleConfig = _nativeOracleConfig;
+        _updateNativeOracleConfig(_nativeOracleConfig);
         nativeAssetToUsdOracleDecimals = nativeAssetToUsdOracle.decimals();
 
         for (uint256 i = 0; i < _tokens.length; i++) {
@@ -147,7 +147,7 @@ abstract contract PriceOracleHelper {
      * @dev Emits NativeOracleConfigUpdated event
      * @param _newConfig The new oracle configuration
      */
-    function _updateNativeOracleConfig(IOracleHelper.NativeOracleConfig calldata _newConfig) internal {
+    function _updateNativeOracleConfig(IOracleHelper.NativeOracleConfig memory _newConfig) internal {
         if (_newConfig.maxOracleRoundAge == 0 || _newConfig.maxOracleRoundAge > MAX_ALLOWED_ROUND_AGE) {
             revert IOracleHelper.InvalidMaxOracleRoundAge();
         }
