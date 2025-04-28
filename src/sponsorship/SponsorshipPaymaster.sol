@@ -517,8 +517,6 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         if (executionGasLimit > executionGasUsed) {
             expectedPenaltyGas = (executionGasLimit - executionGasUsed) * PENALTY_PERCENT / 100;
         }
-        // Review: could emit expected penalty gas
-
         // Include unaccountedGas since EP doesn't include this in actualGasCost
         // unaccountedGas = postOpGas + EP overhead gas
         _actualGasCost = _actualGasCost + ((unaccountedGas + expectedPenaltyGas) * _actualUserOpFeePerGas);

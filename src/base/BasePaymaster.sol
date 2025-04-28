@@ -163,6 +163,7 @@ abstract contract BasePaymaster is IPaymaster, SoladyOwnable {
         virtual
     {
         (_mode, _context, _actualGasCost, _actualUserOpFeePerGas); // unused params
+        // subclass must override this method if validatePaymasterUserOp returns a context
         revert("BasePaymaster: _postOp must be overridden");
     }
 
