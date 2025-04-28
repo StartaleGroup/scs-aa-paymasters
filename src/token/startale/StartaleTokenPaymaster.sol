@@ -262,6 +262,8 @@ contract StartaleTokenPaymaster is
     /**
      * @notice Updates the native asset to USD oracle
      * @param _newNativeAssetToUsdOracle The new native asset to USD oracle address
+     * @param _nativeAssetMaxOracleRoundAge The round age config of new native oracle
+     * @param _nativeAssetDecimals The decimals config for new native oracle
      */
     function updateNativeAssetToUsdOracle(
         address _newNativeAssetToUsdOracle,
@@ -539,7 +541,6 @@ contract StartaleTokenPaymaster is
                 revert TokenPriceFeedErrored(tokenAddress);
             }
 
-            // There is no preCharged amount so we can go ahead and transfer the token now
             uint256 tokenAmount = (
                 effectiveCost * effectiveExchangeRate + (10 ** nativeOracleConfig.nativeAssetDecimals) - 1
             ) / (10 ** nativeOracleConfig.nativeAssetDecimals);
