@@ -300,7 +300,11 @@ contract StartaleTokenPaymaster is
      * @param _allowAllBundlers Boolean indicating if all bundlers should be allowed
      */
     function allowAllBundlersYesOrNo(bool _allowAllBundlers) external onlyOwner {
-        allowAllBundlers = _allowAllBundlers;
+        // Only update and emit if there's an actual change
+        if (allowAllBundlers != _allowAllBundlers) {
+            allowAllBundlers = _allowAllBundlers;
+            emit AllowAllBundlersUpdated(_allowAllBundlers);
+        }
     }
 
     // External view/pure functions
@@ -496,10 +500,6 @@ contract StartaleTokenPaymaster is
             revert PostOpGasLimitTooLow();
         }
 
-        if (!allowAllBundlers && !isBundlerAllowed[tx.origin]) {
-            revert BundlerNotAllowed(tx.origin);
-        }
-
         // Save state to help calculate the expected penalty during postOp
         uint256 preOpGasApproximation = _userOp.preVerificationGas + _userOp.unpackVerificationGasLimit()
             + _userOp.unpackPaymasterVerificationGasLimit();
@@ -507,6 +507,11 @@ contract StartaleTokenPaymaster is
         uint256 executionGasLimit = _userOp.unpackCallGasLimit() + _userOp.unpackPostOpGasLimit();
 
         if (mode == PaymasterMode.INDEPENDENT) {
+            // Check if bundler is allowed
+            if (!allowAllBundlers && !isBundlerAllowed[tx.origin]) {
+                revert BundlerNotAllowed(tx.origin);
+            }
+
             (address tokenAddress) = modeSpecificData.parseIndependentModeSpecificData();
             // Check length - it must be 20 bytes
             if (modeSpecificData.length != 20) {
