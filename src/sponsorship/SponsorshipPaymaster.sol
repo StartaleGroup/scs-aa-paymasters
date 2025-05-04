@@ -14,7 +14,7 @@ import {ISponsorshipPaymaster} from "../interfaces/ISponsorshipPaymaster.sol";
 import {MultiSigners} from "../lib/MultiSigners.sol";
 
 /**
- * @title SponsorshipPaymaster
+ * @title self-funded SponsorshipPaymaster
  * @notice Paymaster contract that enables transaction sponsorship for account abstraction
  * @dev Manages funds from sponsors to pay for user operations
  */
@@ -34,6 +34,9 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
 
     // Limit for unaccounted gas cost
     uint256 private constant UNACCOUNTED_GAS_LIMIT = 150_000;
+
+    // Penalty percentage for exceeding the execution gas limit
+    uint256 private constant PENALTY_PERCENT = 10;
 
     // paymasterData is sponsorAccount(20 bytes) + validUntil(6 bytes) + validAfter(6 bytes) + feeMarkup(4 bytes) + signature
 
@@ -80,6 +83,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         minDeposit = _minDeposit;
         sponsorWithdrawalDelay = _withdrawalDelay;
         unaccountedGas = _unaccountedGas;
+        emit UnaccountedGasChanged(0, _unaccountedGas);
     }
 
     /**
@@ -118,6 +122,9 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
      * @param _newMinDeposit The new minimum deposit value
      */
     function setMinDeposit(uint256 _newMinDeposit) external onlyOwner {
+        if (_newMinDeposit == 0) {
+            revert MinDepositCanNotBeZero();
+        }
         emit MinDepositChanged(minDeposit, _newMinDeposit);
         minDeposit = _newMinDeposit;
     }
@@ -128,6 +135,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
      * @param _amount The amount of ETH the user wishes to withdraw
      */
     function requestWithdrawal(address _withdrawAddress, uint256 _amount) external {
+        uint256 currentBalance = sponsorBalances[msg.sender];
         // check zero address for withdrawal
         if (_withdrawAddress == address(0)) {
             revert InvalidWithdrawalAddress();
@@ -136,8 +144,15 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         if (_amount == 0) {
             revert CanNotWithdrawZeroAmount();
         }
-        if (sponsorBalances[msg.sender] < _amount) {
-            revert InsufficientFunds(msg.sender, sponsorBalances[msg.sender], _amount);
+        if (currentBalance < _amount) {
+            revert InsufficientFunds(msg.sender, currentBalance, _amount);
+        }
+        uint256 balanceAfterWithdrawal = currentBalance - _amount;
+        /// notice: have to display this on front end.
+        /// applies to fee collector as well.
+        /// toggle to withdraw full instead of manually entering amount.
+        if (balanceAfterWithdrawal != 0 && balanceAfterWithdrawal < minDeposit) {
+            revert RequiredToWithdrawFullBalanceOrKeepMinDeposit(currentBalance, _amount, minDeposit);
         }
         withdrawalRequests[msg.sender] =
             WithdrawalRequest({amount: _amount, to: _withdrawAddress, requestSubmittedTimestamp: block.timestamp});
@@ -149,7 +164,13 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
      * @param _newWithdrawalDelay The new withdrawal delay in seconds
      */
     function setWithdrawalDelay(uint256 _newWithdrawalDelay) external onlyOwner {
+        if (_newWithdrawalDelay > 86400) {
+            // 1 day
+            revert WithdrawalDelayTooLong();
+        }
+        uint256 oldWithdrawalDelay = sponsorWithdrawalDelay;
         sponsorWithdrawalDelay = _newWithdrawalDelay;
+        emit WithdrawalDelayChanged(oldWithdrawalDelay, _newWithdrawalDelay);
     }
 
     /**
@@ -173,6 +194,14 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         delete withdrawalRequests[_sponsorAccount];
         entryPoint.withdrawTo(payable(req.to), req.amount);
         emit WithdrawalExecuted(_sponsorAccount, req.to, req.amount);
+    }
+
+    /**
+     * @dev Cancel a withdrawal request
+     */
+    function cancelWithdrawal() external {
+        delete withdrawalRequests[msg.sender];
+        emit WithdrawalRequestCancelledFor(msg.sender);
     }
 
     /**
@@ -208,6 +237,9 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
      * @param _amount The amount of ETH to withdraw
      */
     function withdrawEth(address payable _recipient, uint256 _amount) external payable onlyOwner nonReentrant {
+        if (_recipient == address(0)) {
+            revert InvalidWithdrawalAddress();
+        }
         (bool success,) = _recipient.call{value: _amount}("");
         if (!success) {
             revert WithdrawalFailed();
@@ -412,6 +444,10 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
             )
         );
 
+        if (recoveredSigner == address(0)) {
+            revert PotentiallyMalformedSignature();
+        }
+
         bool isValidSig = signers[recoveredSigner];
 
         uint256 validationData = _packValidationData(!isValidSig, validUntil, validAfter);
@@ -426,26 +462,18 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
             revert InvalidPriceMarkup();
         }
 
-        // Calculate the max penalty to ensure the paymaster doesn't underpay
-        // Note: This is just a check to approximate max charge including penalty
-        uint256 maxPenalty = (
-            (
-                uint128(uint256(_userOp.accountGasLimits))
-                    + uint128(bytes16(_userOp.paymasterAndData[PAYMASTER_POSTOP_GAS_OFFSET:PAYMASTER_DATA_OFFSET]))
-            ) * 10 * _userOp.unpackMaxFeePerGas()
-        ) / 100;
-
         // Calculate effective cost including unaccountedGas and feeMarkup
-        uint256 effectiveCost =
-            ((_requiredPreFund + (unaccountedGas * _userOp.unpackMaxFeePerGas())) * feeMarkup) / FEE_MARKUP_DENOMINATOR;
+        uint256 effectiveCost = (
+            ((_requiredPreFund + (unaccountedGas * _userOp.unpackMaxFeePerGas())) * feeMarkup) + FEE_MARKUP_DENOMINATOR
+                - 1
+        ) / FEE_MARKUP_DENOMINATOR;
 
         // Ensure the paymaster can cover the effective cost + max penalty
-        if (effectiveCost + maxPenalty > sponsorBalances[sponsorAccount]) {
-            revert InsufficientFunds(sponsorAccount, sponsorBalances[sponsorAccount], effectiveCost + maxPenalty);
+        if (effectiveCost > sponsorBalances[sponsorAccount]) {
+            revert InsufficientFunds(sponsorAccount, sponsorBalances[sponsorAccount], effectiveCost);
         }
 
-        sponsorBalances[sponsorAccount] -= (effectiveCost + maxPenalty);
-        emit UserOperationSponsored(_userOpHash, _userOp.getSender());
+        sponsorBalances[sponsorAccount] -= (effectiveCost);
 
         // Save some state to help calculate the expected penalty during postOp
         uint256 preOpGasApproximation = _userOp.preVerificationGas + _userOp.unpackVerificationGasLimit()
@@ -453,7 +481,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         uint256 executionGasLimit = _userOp.unpackCallGasLimit() + _userOp.unpackPostOpGasLimit();
 
         return (
-            abi.encode(sponsorAccount, feeMarkup, effectiveCost + maxPenalty, preOpGasApproximation, executionGasLimit),
+            abi.encode(sponsorAccount, feeMarkup, effectiveCost, preOpGasApproximation, executionGasLimit),
             validationData
         );
     }
@@ -469,6 +497,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
         internal
         override
     {
+        (_mode);
         (
             address sponsorAccount,
             uint32 feeMarkup,
@@ -486,15 +515,13 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
 
         uint256 expectedPenaltyGas;
         if (executionGasLimit > executionGasUsed) {
-            expectedPenaltyGas = (executionGasLimit - executionGasUsed) * 10 / 100;
+            expectedPenaltyGas = (executionGasLimit - executionGasUsed) * PENALTY_PERCENT / 100;
         }
-        // Review: could emit expected penalty gas
-
         // Include unaccountedGas since EP doesn't include this in actualGasCost
         // unaccountedGas = postOpGas + EP overhead gas
         _actualGasCost = _actualGasCost + ((unaccountedGas + expectedPenaltyGas) * _actualUserOpFeePerGas);
 
-        uint256 adjustedGasCost = (_actualGasCost * feeMarkup) / FEE_MARKUP_DENOMINATOR;
+        uint256 adjustedGasCost = (_actualGasCost * feeMarkup + FEE_MARKUP_DENOMINATOR - 1) / FEE_MARKUP_DENOMINATOR;
         uint256 premium = adjustedGasCost - _actualGasCost;
         sponsorBalances[feeCollector] += premium;
 
@@ -502,7 +529,6 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
             // Refund excess gas fees
             uint256 refund = prechargedAmount - adjustedGasCost;
             sponsorBalances[sponsorAccount] += refund;
-            // Review: whether to consider this for premium
             emit RefundProcessed(sponsorAccount, refund);
         } else {
             // Handle undercharge scenario
@@ -510,8 +536,7 @@ contract SponsorshipPaymaster is BasePaymaster, MultiSigners, ReentrancyGuardTra
             sponsorBalances[sponsorAccount] -= deduction;
         }
 
-        // Note: can emit the mode
-        emit GasBalanceDeducted(sponsorAccount, _actualGasCost, premium, _mode);
+        emit GasBalanceDeducted(sponsorAccount, adjustedGasCost, premium);
     }
 
     /**

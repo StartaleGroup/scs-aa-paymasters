@@ -14,6 +14,8 @@ library TokenPaymasterParserLib {
     /// @dev Start offset of mode in paymaster and data
     uint256 private constant PAYMASTER_MODE_OFFSET = UserOperationLib.PAYMASTER_DATA_OFFSET;
 
+    error InvalidPaymasterData();
+
     /**
      * @notice Parses the paymaster mode and specific data from paymasterAndData
      * @param _paymasterAndData The packed paymaster data from the UserOperation
@@ -25,6 +27,9 @@ library TokenPaymasterParserLib {
         pure
         returns (IStartaleTokenPaymaster.PaymasterMode mode, bytes calldata modeSpecificData)
     {
+        if (_paymasterAndData.length < PAYMASTER_MODE_OFFSET + 1) {
+            revert InvalidPaymasterData();
+        }
         unchecked {
             mode = IStartaleTokenPaymaster.PaymasterMode(uint8(bytes1(_paymasterAndData[PAYMASTER_MODE_OFFSET])));
             modeSpecificData = _paymasterAndData[PAYMASTER_MODE_OFFSET + 1:];
@@ -41,6 +46,9 @@ library TokenPaymasterParserLib {
         pure
         returns (address tokenAddress)
     {
+        if (modeSpecificData.length < 20) {
+            revert InvalidPaymasterData();
+        }
         tokenAddress = address(bytes20(modeSpecificData[:20]));
     }
 
@@ -66,6 +74,9 @@ library TokenPaymasterParserLib {
             bytes calldata signature
         )
     {
+        if (modeSpecificData.length < 70) {
+            revert InvalidPaymasterData();
+        }
         validUntil = uint48(bytes6(modeSpecificData[:6]));
         validAfter = uint48(bytes6(modeSpecificData[6:12]));
         tokenAddress = address(bytes20(modeSpecificData[12:32]));

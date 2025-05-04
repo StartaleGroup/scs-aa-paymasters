@@ -75,6 +75,32 @@ interface IStartaleTokenPaymasterEventsAndErrors {
         address indexed user, address indexed token, uint256 tokenCharge, uint48 appliedMarkup, uint256 exchangeRate
     );
 
+    /**
+     * @notice Emitted when the token fees treasury is changed
+     * @param oldTokenFeesTreasury The previous token fees treasury
+     * @param newTokenFeesTreasury The new token fees treasury
+     */
+    event TokenFeesTreasuryChanged(address indexed oldTokenFeesTreasury, address indexed newTokenFeesTreasury);
+
+    /**
+     * @notice Emitted when the unaccounted gas value is changed
+     * @param oldUnaccountedGas The previous unaccounted gas value
+     * @param newUnaccountedGas The new unaccounted gas value
+     */
+    event UnaccountedGasChanged(uint256 oldUnaccountedGas, uint256 newUnaccountedGas);
+
+    /// @notice Event for changing a bundler allowlist configuration
+    ///
+    /// @param bundler Address of the bundler
+    /// @param allowed True if was allowlisted, false if removed from allowlist
+    event BundlerAllowlistUpdated(address bundler, bool allowed);
+
+    /**
+     * @notice Event for changing the bundler allowlist configuration
+     * @param allowed True if all bundlers are allowed, false if specific bundlers are allowed
+     */
+    event AllowAllBundlersUpdated(bool allowed);
+
     // Errors
 
     /**
@@ -168,4 +194,26 @@ interface IStartaleTokenPaymasterEventsAndErrors {
      * @notice Error thrown when an invalid token fees treasury address is provided
      */
     error InvalidTokenFeesTreasury();
+
+    /**
+     * @notice Error thrown when an invalid exchange rate is provided
+     * @param tokenAddress The address of the token with the invalid exchange rate
+     */
+    error InvalidExchangeRate(address tokenAddress);
+
+    /**
+     * @notice Error thrown when a potentially malformed signature is detected
+     */
+    error PotentiallyMalformedSignature();
+
+    /**
+     * @notice Error thrown when a bundler is not allowed
+     * @param bundler The address of the bundler that is not allowed
+     */
+    error BundlerNotAllowed(address bundler);
+
+    /**
+     * @notice Error thrown when an insufficient ERC20 balance is detected in validation stage
+     */
+    error InsufficientERC20Balance();
 }

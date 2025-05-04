@@ -78,6 +78,7 @@ contract DeployTokenPaymasterMinato is Script {
             _feeTreasury,
             _unaccountedGas,
             _nativeAssetToUsdOracle,
+            address(0),
             _nativeAssetMaxOracleRoundAge,
             _nativeAssetDecimals,
             _independentTokens,

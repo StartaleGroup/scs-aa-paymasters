@@ -17,21 +17,30 @@ abstract contract PriceOracleHelper {
     error IncompleteRound();
     error StalePrice();
     error OracleDecimalsMismatch();
+    error SequencerDown();
+    error GracePeriodNotOver();
+
+    uint256 private constant GRACE_PERIOD_TIME = 3600;
+    uint48 private constant MAX_ALLOWED_ROUND_AGE = 172800; // 48 hours
 
     // State variables
     IOracle public nativeAssetToUsdOracle; // ETH -> USD price oracle
+    IOracle public sequencerUptimeOracle; // Sequencer uptime oracle
+    uint8 internal nativeAssetToUsdOracleDecimals;
     IOracleHelper.NativeOracleConfig public nativeOracleConfig;
     mapping(address => IOracleHelper.TokenOracleConfig) public tokenOracleConfigurations;
 
     /**
      * @notice Initializes the oracle helper with native and token oracle configurations
      * @param _nativeAssetToUsdOracle Address of the native asset to USD oracle
+     * @param _sequencerUptimeOracle Address of the sequencer uptime oracle
      * @param _nativeOracleConfig Configuration for the native asset oracle
      * @param _tokens Array of token addresses to configure
      * @param _tokenOracleConfigs Array of token oracle configurations
      */
     constructor(
         address _nativeAssetToUsdOracle,
+        address _sequencerUptimeOracle,
         IOracleHelper.NativeOracleConfig memory _nativeOracleConfig,
         address[] memory _tokens,
         IOracleHelper.TokenOracleConfig[] memory _tokenOracleConfigs
@@ -41,7 +50,9 @@ abstract contract PriceOracleHelper {
         }
 
         nativeAssetToUsdOracle = IOracle(_nativeAssetToUsdOracle);
-        nativeOracleConfig = _nativeOracleConfig;
+        sequencerUptimeOracle = IOracle(_sequencerUptimeOracle);
+        _updateNativeOracleConfig(_nativeOracleConfig);
+        nativeAssetToUsdOracleDecimals = nativeAssetToUsdOracle.decimals();
 
         for (uint256 i = 0; i < _tokens.length; i++) {
             _setTokenOracleConfig(_tokens[i], _tokenOracleConfigs[i]);
@@ -76,13 +87,43 @@ abstract contract PriceOracleHelper {
             revert NoOracleConfiguredForToken(_token);
         }
 
-        // Check if the oracle decimals match
-        if (IOracle(config.tokenOracle).decimals() != IOracle(nativeAssetToUsdOracle).decimals()) {
-            revert OracleDecimalsMismatch();
+        uint8 tokenOracleDecimals = IOracle(config.tokenOracle).decimals();
+
+        // If it is set to zero(which is allowed), we don't need to check the sequencer uptime because it is not L2 like arbitrum, optimism, base or soneium.
+        if (sequencerUptimeOracle != IOracle(address(0))) {
+            (
+                /*uint80 roundID*/
+                ,
+                int256 answer,
+                uint256 startedAt,
+                /*uint256 updatedAt*/
+                ,
+                /*uint80 answeredInRound*/
+            ) = sequencerUptimeOracle.latestRoundData();
+
+            // Answer == 0: Sequencer is up
+            // Answer == 1: Sequencer is down
+            bool isSequencerUp = answer == 0;
+            if (!isSequencerUp) {
+                revert SequencerDown();
+            }
+
+            // Make sure the grace period has passed after the
+            // sequencer is back up.
+            uint256 timeSinceUp = block.timestamp - startedAt;
+            if (timeSinceUp <= GRACE_PERIOD_TIME) {
+                revert GracePeriodNotOver();
+            }
         }
 
         uint256 tokenPrice = fetchPrice(config.tokenOracle, config.maxOracleRoundAge);
         uint256 nativePrice = fetchPrice(nativeAssetToUsdOracle, nativeOracleConfig.maxOracleRoundAge);
+
+        if (tokenOracleDecimals > nativeAssetToUsdOracleDecimals) {
+            nativePrice *= 10 ** (tokenOracleDecimals - nativeAssetToUsdOracleDecimals);
+        } else if (tokenOracleDecimals < nativeAssetToUsdOracleDecimals) {
+            tokenPrice *= 10 ** (nativeAssetToUsdOracleDecimals - tokenOracleDecimals);
+        }
 
         // Calculate: (nativePrice * 10^tokenDecimals) / tokenPrice
         exchangeRate = (nativePrice * 10 ** IERC20Metadata(_token).decimals()) / tokenPrice;
@@ -106,9 +147,23 @@ abstract contract PriceOracleHelper {
      * @dev Emits NativeOracleConfigUpdated event
      * @param _newConfig The new oracle configuration
      */
-    function _updateNativeOracleConfig(IOracleHelper.NativeOracleConfig calldata _newConfig) internal {
+    function _updateNativeOracleConfig(IOracleHelper.NativeOracleConfig memory _newConfig) internal {
+        if (_newConfig.maxOracleRoundAge == 0 || _newConfig.maxOracleRoundAge > MAX_ALLOWED_ROUND_AGE) {
+            revert IOracleHelper.InvalidMaxOracleRoundAge();
+        }
         nativeOracleConfig = _newConfig;
         emit IOracleHelper.NativeOracleConfigUpdated(_newConfig);
+    }
+
+    /**
+     * @notice Updates the native asset to USD oracle
+     * @dev Emits NativeAssetToUsdOracleUpdated event
+     * @param _newNativeAssetToUsdOracle The new native asset to USD oracle address
+     */
+    function _updateNativeAssetToUsdOracle(address _newNativeAssetToUsdOracle) internal {
+        nativeAssetToUsdOracle = IOracle(_newNativeAssetToUsdOracle);
+        nativeAssetToUsdOracleDecimals = nativeAssetToUsdOracle.decimals();
+        emit IOracleHelper.NativeAssetToUsdOracleUpdated(_newNativeAssetToUsdOracle);
     }
 
     // Internal view functions
@@ -120,15 +175,12 @@ abstract contract PriceOracleHelper {
      * @return price The latest price fetched from the Oracle
      */
     function fetchPrice(IOracle _oracle, uint48 _maxOracleRoundAge) internal view returns (uint256 price) {
-        (uint80 roundId, int256 answer,, uint256 updatedAt, uint80 answeredInRound) = _oracle.latestRoundData();
+        (, int256 answer,, uint256 updatedAt,) = _oracle.latestRoundData();
 
         if (answer <= 0) {
             revert PriceShouldBePositive();
         }
         if (updatedAt < block.timestamp - _maxOracleRoundAge) {
-            revert IncompleteRound();
-        }
-        if (answeredInRound < roundId) {
             revert StalePrice();
         }
 
@@ -147,7 +199,7 @@ abstract contract PriceOracleHelper {
         if (address(_config.tokenOracle) == address(0)) {
             revert IOracleHelper.InvalidOracleAddress();
         }
-        if (_config.maxOracleRoundAge == 0) {
+        if (_config.maxOracleRoundAge == 0 || _config.maxOracleRoundAge > MAX_ALLOWED_ROUND_AGE) {
             revert IOracleHelper.InvalidMaxOracleRoundAge();
         }
 

@@ -12,6 +12,7 @@ import {TestCounter} from "../../TestCounter.sol";
 import {MockToken} from "../../mock/MockToken.sol";
 import {MockOracle} from "../../mock/MockOracle.sol";
 import {IOracle} from "../../../../src/interfaces/IOracle.sol";
+import {PriceOracleHelper} from "../../../../src/token/startale/PriceOracleHelper.sol";
 
 contract TestTokenPaymaster is TestBase {
     uint256 public constant WITHDRAWAL_DELAY = 3600;
@@ -46,6 +47,7 @@ contract TestTokenPaymaster is TestBase {
             _tokenFeesTreasury: PAYMASTER_FEE_COLLECTOR.addr,
             _unaccountedGas: UNACCOUNTED_GAS,
             _nativeAssetToUsdOracle: address(nativeAssetToUsdOracle),
+            _sequencerUptimeOracle: address(0),
             _nativeAssetMaxOracleRoundAge: MAX_ORACLE_ROUND_AGE,
             _nativeAssetDecimals: 18,
             _independentTokens: _toSingletonArray(address(testToken)),
@@ -68,6 +70,7 @@ contract TestTokenPaymaster is TestBase {
             PAYMASTER_FEE_COLLECTOR.addr,
             UNACCOUNTED_GAS, // unaccounted gas
             address(nativeAssetToUsdOracle),
+            address(0),
             MAX_ORACLE_ROUND_AGE,
             18, // native token decimals
             _toSingletonArray(address(testToken)),
@@ -333,7 +336,7 @@ contract TestTokenPaymaster is TestBase {
         testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
 
         vm.startPrank(PAYMASTER_OWNER.addr);
-        tokenPaymaster.setUnaccountedGas(40_000);
+        tokenPaymaster.setUnaccountedGas(20_000);
         vm.stopPrank();
 
         // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
@@ -409,7 +412,7 @@ contract TestTokenPaymaster is TestBase {
         testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
 
         vm.startPrank(PAYMASTER_OWNER.addr);
-        tokenPaymaster.setUnaccountedGas(40_000);
+        tokenPaymaster.setUnaccountedGas(20_000);
         tokenPaymaster.updateTokenFeeMarkup(address(testToken), 1.2e6);
         vm.stopPrank();
 
@@ -525,61 +528,14 @@ contract TestTokenPaymaster is TestBase {
         startPrank(BUNDLER.addr);
         uint256 gasValue = gasleft();
 
-        vm.expectEmit(false, false, false, false, ENTRYPOINT_ADDRESS);
-        // Review: can emit exact expected values and reason: IncompleteRound
-        emit IEntryPoint.PostOpRevertReason(userOpHash, address(0), 0, new bytes(0));
-
-        ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
-        gasValue = gasValue - gasleft();
-        stopPrank();
-    }
-
-    function test_Revert_PostOp_If_StalePrice() external {
-        tokenToUsdOracle.setAnsweredInRoundId(73_786_976_294_838_215_802 - 100);
-
-        vm.startPrank(PAYMASTER_OWNER.addr);
-        tokenPaymaster.updateTokenOracleConfig(
-            address(testToken),
-            IOracleHelper.TokenOracleConfig({tokenOracle: IOracle(address(tokenToUsdOracle)), maxOracleRoundAge: 1000})
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IEntryPoint.FailedOpWithRevert.selector,
+                0,
+                "AA33 reverted",
+                abi.encodeWithSelector(PriceOracleHelper.StalePrice.selector)
+            )
         );
-        vm.stopPrank();
-
-        vm.warp(1742296776);
-        tokenPaymaster.deposit{value: 10 ether}();
-        testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
-
-        vm.startPrank(PAYMASTER_OWNER.addr);
-        tokenPaymaster.setUnaccountedGas(40_000);
-        vm.stopPrank();
-
-        // Warm up the ERC20 balance slot for tokenFeeTreasury by making some tokens held initially
-        testToken.mint(PAYMASTER_FEE_COLLECTOR.addr, 100_000 * (10 ** testToken.decimals()));
-
-        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
-
-        // Good part of not doing pre-charge and only charging in postOp is we can give approval during the execution phase.
-        // So we build a userOp with approve calldata.
-        bytes memory userOpCalldata = abi.encodeWithSelector(
-            SimpleAccount.execute.selector,
-            address(testToken),
-            0,
-            abi.encodeWithSelector(testToken.approve.selector, address(tokenPaymaster), 1000 * 1e18)
-        );
-
-        // Generate and sign the token paymaster data
-        (PackedUserOperation memory userOp, bytes32 userOpHash) = createUserOpWithTokenPaymasterAndIndependentMode(
-            ALICE, tokenPaymaster, address(testToken), 100_000, userOpCalldata
-        );
-
-        ops[0] = userOp;
-
-        // Execute the operation
-        startPrank(BUNDLER.addr);
-        uint256 gasValue = gasleft();
-
-        vm.expectEmit(false, false, false, false, ENTRYPOINT_ADDRESS);
-        // Review: can emit exact expected values and reason: StalePrice
-        emit IEntryPoint.PostOpRevertReason(userOpHash, address(0), 0, new bytes(0));
 
         ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
         gasValue = gasValue - gasleft();
@@ -665,10 +621,14 @@ contract TestTokenPaymaster is TestBase {
         startPrank(BUNDLER.addr);
         uint256 gasValue = gasleft();
 
-        vm.expectEmit(false, false, false, false, ENTRYPOINT_ADDRESS);
-        // Review: can emit exact expected values and reason: FailedToChargeTokens
-        /// @note: UserOp does not revert when the postOp reverts.
-        emit IEntryPoint.PostOpRevertReason(userOpHash, address(0), 0, new bytes(0));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IEntryPoint.FailedOpWithRevert.selector,
+                0,
+                "AA33 reverted",
+                abi.encodeWithSelector(IStartaleTokenPaymasterEventsAndErrors.InsufficientERC20Balance.selector)
+            )
+        );
 
         ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
         gasValue = gasValue - gasleft();
@@ -687,7 +647,7 @@ contract TestTokenPaymaster is TestBase {
         vm.stopPrank();
     }
 
-    function test_RevertIf_Mismatching_Oracle_Decimals_Independent_Mode() external {
+    function test_DoesNotRevertIf_Mismatching_Oracle_Decimals_Independent_Mode() external {
         vm.warp(1742296776);
         tokenPaymaster.deposit{value: 10 ether}();
         testToken.mint(address(ALICE_ACCOUNT), 100_000 * (10 ** testToken.decimals()));
@@ -734,10 +694,6 @@ contract TestTokenPaymaster is TestBase {
         startPrank(BUNDLER.addr);
         uint256 gasValue = gasleft();
 
-        vm.expectEmit(false, false, false, false, ENTRYPOINT_ADDRESS);
-        // Review: can emit exact expected values and reason: OracleDecimalsMismatch
-        emit IEntryPoint.PostOpRevertReason(userOpHash, address(0), 0, new bytes(0));
-
         ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
         gasValue = gasValue - gasleft();
         stopPrank();
@@ -756,6 +712,7 @@ contract TestTokenPaymaster is TestBase {
             PAYMASTER_FEE_COLLECTOR.addr,
             UNACCOUNTED_GAS, // unaccounted gas
             address(nativeAssetToUsdOracle),
+            address(0),
             MAX_ORACLE_ROUND_AGE,
             18, // native token decimals
             _toSingletonArray(address(testToken)),
@@ -785,6 +742,7 @@ contract TestTokenPaymaster is TestBase {
             PAYMASTER_FEE_COLLECTOR.addr,
             UNACCOUNTED_GAS, // unaccounted gas
             address(nativeAssetToUsdOracle),
+            address(0),
             MAX_ORACLE_ROUND_AGE,
             18, // native token decimals
             _toSingletonArray(address(testToken)),
@@ -818,6 +776,7 @@ contract TestTokenPaymaster is TestBase {
             address(0),
             UNACCOUNTED_GAS, // unaccounted gas
             address(nativeAssetToUsdOracle),
+            address(0),
             MAX_ORACLE_ROUND_AGE,
             18, // native token decimals
             _toSingletonArray(address(testToken)),
@@ -874,8 +833,12 @@ contract TestTokenPaymaster is TestBase {
         startPrank(BUNDLER.addr);
         uint256 gasValue = gasleft();
 
-        bytes memory expectedRevertReason =
-            abi.encodeWithSelector(IEntryPoint.FailedOp.selector, 0, "AA34 signature error");
+        bytes memory expectedRevertReason = abi.encodeWithSelector(
+            IEntryPoint.FailedOpWithRevert.selector,
+            0,
+            "AA33 reverted",
+            abi.encodeWithSelector(IStartaleTokenPaymasterEventsAndErrors.PotentiallyMalformedSignature.selector)
+        );
         vm.expectRevert(expectedRevertReason);
 
         ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));

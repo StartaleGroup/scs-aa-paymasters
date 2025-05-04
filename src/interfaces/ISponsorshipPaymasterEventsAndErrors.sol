@@ -105,14 +105,30 @@ interface ISponsorshipPaymasterEventsAndErrors {
      */
     error WithdrawalFailed();
 
-    // Events
+    /**
+     * @notice Error thrown when the minimum deposit is set to zero
+     */
+    error MinDepositCanNotBeZero();
 
     /**
-     * @notice Emitted when a user operation is sponsored
-     * @param userOpHash The hash of the sponsored user operation
-     * @param user The address of the user whose operation is sponsored
+     * @notice Error thrown when the withdrawal delay is set to a value greater than 1 day
      */
-    event UserOperationSponsored(bytes32 indexed userOpHash, address indexed user);
+    error WithdrawalDelayTooLong();
+
+    /**
+     * @notice Error thrown when a potentially malformed signature is detected
+     */
+    error PotentiallyMalformedSignature();
+
+    /**
+     * @notice Error thrown when a user has insufficient funds for a withdrawal
+     * @param balance The user's current balance
+     * @param amount The amount requested for withdrawal
+     * @param minDeposit current minimum deposit
+     */
+    error RequiredToWithdrawFullBalanceOrKeepMinDeposit(uint256 balance, uint256 amount, uint256 minDeposit);
+
+    // Events
 
     /**
      * @notice Emitted when a user adds a deposit
@@ -126,9 +142,8 @@ interface ISponsorshipPaymasterEventsAndErrors {
      * @param user The sponsor address
      * @param amount The amount of gas cost deducted
      * @param premium The premium amount (markup) applied
-     * @param mode The post-operation mode
      */
-    event GasBalanceDeducted(address indexed user, uint256 amount, uint256 premium, IPaymaster.PostOpMode mode);
+    event GasBalanceDeducted(address indexed user, uint256 amount, uint256 premium);
 
     /**
      * @notice Emitted when a withdrawal request is submitted
@@ -189,4 +204,17 @@ interface ISponsorshipPaymasterEventsAndErrors {
      * @param amount The amount of tokens withdrawn
      */
     event TokensWithdrawn(address indexed token, address indexed to, address indexed actor, uint256 amount);
+
+    /**
+     * @notice Emitted when a withdrawal request is cancelled
+     * @param sponsorAccount The address of the sponsor who cancelled the withdrawal request
+     */
+    event WithdrawalRequestCancelledFor(address sponsorAccount);
+
+    /**
+     * @notice Emitted when the withdrawal delay is changed
+     * @param oldWithdrawalDelay The previous withdrawal delay
+     * @param newWithdrawalDelay The new withdrawal delay
+     */
+    event WithdrawalDelayChanged(uint256 oldWithdrawalDelay, uint256 newWithdrawalDelay);
 }
