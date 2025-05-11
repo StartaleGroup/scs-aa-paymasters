@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.29;
 
 import {IStartaleTokenPaymaster} from "../interfaces/IStartaleTokenPaymaster.sol";
 import {UserOperationLib, PackedUserOperation} from "@account-abstraction/contracts/core/UserOperationLib.sol";

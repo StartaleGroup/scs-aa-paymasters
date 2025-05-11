@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.29;
 
 //sample "receiver" contract, for testing "exec" from account.
 contract TestCounter {
