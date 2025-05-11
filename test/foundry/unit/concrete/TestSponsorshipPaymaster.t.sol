@@ -9,6 +9,7 @@ import "@account-abstraction/contracts/interfaces/IStakeManager.sol";
 import {MultiSigners} from "../../../../src/lib/MultiSigners.sol";
 import {TestCounter} from "../../TestCounter.sol";
 import {MockToken} from "../../mock/MockToken.sol";
+import {BasePaymaster} from "../../../../src/base/BasePaymaster.sol";
 
 contract TestSponsorshipPaymaster is TestBase {
     SponsorshipPaymaster public sponsorshipPaymaster;
@@ -107,16 +108,9 @@ contract TestSponsorshipPaymaster is TestBase {
         assertEq(sponsorshipPaymaster.unaccountedGas(), UNACCOUNTED_GAS);
     }
 
-    function test_OwnershipTransfer() external prankModifier(PAYMASTER_OWNER.addr) {
-        vm.expectEmit(true, true, false, true, address(sponsorshipPaymaster));
-        emit OwnershipTransferred(PAYMASTER_OWNER.addr, BOB_ADDRESS);
+    function test_Revert_DirectOwnershipTransfer() external prankModifier(PAYMASTER_OWNER.addr) {
+        vm.expectRevert(abi.encodeWithSelector(BasePaymaster.OneStepOwnershipTransferNotAllowed.selector));
         sponsorshipPaymaster.transferOwnership(BOB_ADDRESS);
-        assertEq(sponsorshipPaymaster.owner(), BOB_ADDRESS);
-    }
-
-    function test_RevertIf_OwnershipTransferToZeroAddress() external prankModifier(PAYMASTER_OWNER.addr) {
-        vm.expectRevert(abi.encodeWithSelector(NewOwnerIsZeroAddress.selector));
-        sponsorshipPaymaster.transferOwnership(address(0));
     }
 
     function test_Success_TwoStepOwnershipTransfer() external {
@@ -567,7 +561,7 @@ contract TestSponsorshipPaymaster is TestBase {
 
         sponsorshipPaymaster.depositFor{value: 10 ether}(SPONSOR_ACCOUNT.addr);
         startPrank(PAYMASTER_OWNER.addr);
-        sponsorshipPaymaster.setUnaccountedGas(11_000);
+        sponsorshipPaymaster.setUnaccountedGas(14_000);
         stopPrank();
 
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
@@ -583,9 +577,7 @@ contract TestSponsorshipPaymaster is TestBase {
 
         // submit userops
         vm.expectEmit(true, false, false, false, address(sponsorshipPaymaster));
-        emit ISponsorshipPaymasterEventsAndErrors.GasBalanceDeducted(
-            SPONSOR_ACCOUNT.addr, 0, 0, IPaymaster.PostOpMode.opSucceeded
-        );
+        emit ISponsorshipPaymasterEventsAndErrors.GasBalanceDeducted(SPONSOR_ACCOUNT.addr, 0, 0);
         startPrank(BUNDLER.addr);
         ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
         stopPrank();
@@ -641,9 +633,7 @@ contract TestSponsorshipPaymaster is TestBase {
 
         // submit userops
         vm.expectEmit(true, false, false, false, address(sponsorshipPaymaster));
-        emit ISponsorshipPaymasterEventsAndErrors.GasBalanceDeducted(
-            SPONSOR_ACCOUNT.addr, 0, 0, IPaymaster.PostOpMode.opSucceeded
-        );
+        emit ISponsorshipPaymasterEventsAndErrors.GasBalanceDeducted(SPONSOR_ACCOUNT.addr, 0, 0);
         startPrank(BUNDLER.addr);
         ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
         stopPrank();

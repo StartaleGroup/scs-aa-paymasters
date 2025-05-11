@@ -127,7 +127,7 @@ contract SponsorshipPaymasterTest is Test {
         vm.stopPrank();
 
         uint256 depositAmount = 1 ether;
-        uint256 withdrawAmount = 0.5 ether;
+        uint256 withdrawAmount = 1 ether;
 
         paymaster.depositFor{value: depositAmount}(sponsorAccount);
         assertEq(paymaster.getBalance(sponsorAccount), depositAmount);
