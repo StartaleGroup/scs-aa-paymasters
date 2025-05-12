@@ -6,7 +6,7 @@ import {IOracleHelper} from "../src/interfaces/IOracleHelper.sol";
 import {IOracle} from "../src/interfaces/IOracle.sol";
 import "../src/deployer/Deployer.sol";
 
-contract DeployTokenPaymasterMinatoCreate3 is Script {
+contract DeployTokenPaymasterSoneiumCreate3 is Script {
     Deployer deployerInstance;
     address entryPoint;
     mapping(uint256 => uint256) public DEPLOYMENT_CHAIN_GAS_PRICES;
@@ -33,14 +33,14 @@ contract DeployTokenPaymasterMinatoCreate3 is Script {
         address owner = vm.envAddress("OWNER");
         address feeTreasury = vm.envAddress("TOKEN_FEE_TREASURY");
         uint256 unaccountedGas = vm.envUint("TOKEN_PM_UNACCOUNTED_GAS");
-        address nativeAssetToUsdOracle = vm.envAddress("NATIVE_ASSET_TO_USD_ORACLE_MINATO");
-        address sequencerUptimeOracle = vm.envAddress("SEQUENCER_UPTIME_ORACLE_MINATO");
+        address nativeAssetToUsdOracle = vm.envAddress("NATIVE_ASSET_TO_USD_ORACLE_SONEIUM_MAINNET");
+        address sequencerUptimeOracle = vm.envAddress("SEQUENCER_UPTIME_ORACLE_SONEIUM_MAINNET");
         uint48 nativeAssetMaxOracleRoundAge = uint48(vm.envUint("NATIVE_ASSET_MAX_ORACLE_ROUND_AGE"));
         uint8 nativeAssetDecimals = 18;
 
         // Let's deploy with one Independent Token and more we can add later
-        address astrAddress = vm.envAddress("ASTR_TOKEN_ADDERESS_MINATO");
-        address astrToUsdOracle = vm.envAddress("ASTR_TO_USD_ORACLE_MINATO");
+        address astrAddress = vm.envAddress("ASTR_TOKEN_ADDERESS_SONEIUM_MAINNET");
+        address astrToUsdOracle = vm.envAddress("ASTR_TO_USD_ORACLE_SONEIUM_MAINNET");
         uint48 feeMarkupForIndependentToken = uint48(vm.envUint("FEE_MARKUP_FOR_INDEPENDENT_TOKEN"));
         uint48 astrMaxOracleRoundAge = uint48(vm.envUint("ASTR_MAX_ORACLE_ROUND_AGE"));
 
