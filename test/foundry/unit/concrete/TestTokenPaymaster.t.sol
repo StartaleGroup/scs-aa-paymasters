@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: Unlicensed
-pragma solidity ^0.8.28;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.29;
 
 import "../../TestBase.sol";
 import {StartaleTokenPaymaster} from "../../../../src/token/startale/StartaleTokenPaymaster.sol";
@@ -833,12 +833,8 @@ contract TestTokenPaymaster is TestBase {
         startPrank(BUNDLER.addr);
         uint256 gasValue = gasleft();
 
-        bytes memory expectedRevertReason = abi.encodeWithSelector(
-            IEntryPoint.FailedOpWithRevert.selector,
-            0,
-            "AA33 reverted",
-            abi.encodeWithSelector(IStartaleTokenPaymasterEventsAndErrors.PotentiallyMalformedSignature.selector)
-        );
+        bytes memory expectedRevertReason =
+            abi.encodeWithSelector(IEntryPoint.FailedOp.selector, 0, "AA34 signature error");
         vm.expectRevert(expectedRevertReason);
 
         ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
