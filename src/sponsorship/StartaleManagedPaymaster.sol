@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.29;
 
 import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
 import {ECDSA as ECDSA_solady} from "solady/utils/ECDSA.sol";
@@ -43,7 +43,7 @@ contract StartaleManagedPaymaster is
 
     // paymasterData validUntil(6 bytes) + validAfter(6 bytes) + signature
 
-    event UserOperationSponsored(bytes32 indexed userOpHash, address indexed user);
+    event UserOperationSponsoredForPostpaid(bytes32 indexed userOpHash, address indexed user);
 
     /**
      * @notice Initializes the SponsorshipPaymaster contract
@@ -166,7 +166,7 @@ contract StartaleManagedPaymaster is
         bool isValidSig = signers[recoveredSigner];
 
         if (isValidSig) {
-            emit UserOperationSponsored(userOpHash, _userOp.getSender());
+            emit UserOperationSponsoredForPostpaid(userOpHash, _userOp.getSender());
         }
 
         return ("", _packValidationData(!isValidSig, validUntil, validAfter));
