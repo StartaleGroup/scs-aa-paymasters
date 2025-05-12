@@ -29,3 +29,24 @@ this needs bytecode, salt and constructor args.
 check src/script/DeploySponsorshipPaymasterCreate3.s.sol for example
 
 Deployed address: https://soneium-minato.blockscout.com/address/0x00000864bbb7b8f0d42d41026f2d1c774cecb6dd?tab=contract
+
+
+# What is CREATE3
+
+CREATE3
+CREATE3 isn't itself an EVM opcode but a method that uses CREATE and CREATE2 in combination to eliminate the bytecode from contract address calculation.
+
+Internally, first CREATE2 is used to deploy a CREATE factory or "proxy" which then deploys your contract. So the only data required for address calculation is:
+
+address of the factory contract itself;
+salt (a chosen value).
+CREATE3 factories may also factor in the address of the account that uses the factory to deploy the contract in order to ensure uniqueness of the deployment address. Using a factory that doesn't factor in the account address may be insecure, as then someone else could front-run deployment of your contract to the same address as yours by using the same salt as in your existing deployments and become the owner of it.
+
+As bytecode no longer affects address, you won't have to worry about accidentally making changes to your contracts (which would cause a different deployment address if you used CREATE2).
+
+It also makes it possible to:
+
+Deploy your contract with updated code / using newer compiler on a new blockchain that will have the same address as the older version that had already been deployed on other blockchains;
+use different constructor arguments on different blockchains.
+
+more details here: https://github.com/SKYBITDev3/SKYBIT-Keyless-Deployment 
