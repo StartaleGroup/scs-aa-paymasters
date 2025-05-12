@@ -1,5 +1,5 @@
-//SPDX-License-Identifier: Unlicense
-pragma solidity ^0.8.28;
+//SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.29;
 
 /**
  * @title A library for deploying contracts EIP-3171 style.
