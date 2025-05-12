@@ -309,7 +309,7 @@ contract TestStartaleManagedPaymaster is TestBase {
         uint256 initialPaymasterEpBalance = startaleManagedPaymaster.getDeposit();
         // submit userops
         vm.expectEmit(true, false, false, false, address(startaleManagedPaymaster));
-        emit StartaleManagedPaymaster.UserOperationSponsored(userOpHash, address(ALICE_ADDRESS));
+        emit StartaleManagedPaymaster.UserOperationSponsoredForPostpaid(userOpHash, address(ALICE_ADDRESS));
         startPrank(BUNDLER.addr);
         ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
         stopPrank();
