@@ -15,11 +15,11 @@ abstract contract PriceOracleHelper {
     error NoOracleConfiguredForToken(address token);
     error PriceShouldBePositive();
     error IncompleteRound();
-    error StalePrice();
     error OracleDecimalsMismatch();
     error SequencerDown();
-    error GracePeriodNotOver();
 
+    // Review: If it should be configurable
+    // Need methods to updated sequencer feed and it's config
     uint256 private constant GRACE_PERIOD_TIME = 3600;
     uint48 private constant MAX_ALLOWED_ROUND_AGE = 172800; // 48 hours
 
@@ -79,8 +79,14 @@ abstract contract PriceOracleHelper {
      * @dev Returns the number of tokens per one native token (in wei)
      * @param _token The token address
      * @return exchangeRate The exchange rate of the token to the native asset
+     * @return validUntil The timestamp until which this price is valid
+     * @return validAfter The timestamp after which this price is valid
      */
-    function getExchangeRate(address _token) public view returns (uint256 exchangeRate) {
+    function getExchangeRate(address _token)
+        public
+        view
+        returns (uint256 exchangeRate, uint256 validUntil, uint256 validAfter)
+    {
         IOracleHelper.TokenOracleConfig memory config = tokenOracleConfigurations[_token];
 
         if (address(config.tokenOracle) == address(0)) {
@@ -96,8 +102,7 @@ abstract contract PriceOracleHelper {
                 ,
                 int256 answer,
                 uint256 startedAt,
-                /*uint256 updatedAt*/
-                ,
+                uint256 updatedAt,
                 /*uint80 answeredInRound*/
             ) = sequencerUptimeOracle.latestRoundData();
 
@@ -108,16 +113,38 @@ abstract contract PriceOracleHelper {
                 revert SequencerDown();
             }
 
-            // Make sure the grace period has passed after the
-            // sequencer is back up.
-            uint256 timeSinceUp = block.timestamp - startedAt;
-            if (timeSinceUp <= GRACE_PERIOD_TIME) {
-                revert GracePeriodNotOver();
-            }
+            // Todo: Cleanup comments and review notes once review is finalised
+            // Calculate the validUntil timestamp based on the grace period
+            // Review: If it should be startedAt or updatedAt?
+            // validUntil = updatedAt + GRACE_PERIOD_TIME;
+
+            // otherwise validAfter works
+            validAfter = startedAt + GRACE_PERIOD_TIME;
         }
 
-        uint256 tokenPrice = fetchPrice(config.tokenOracle, config.maxOracleRoundAge);
-        uint256 nativePrice = fetchPrice(nativeAssetToUsdOracle, nativeOracleConfig.maxOracleRoundAge);
+        /// taking the minimum of three timestamps
+        ///
+        /// The validUntil from the sequencer uptime check (if sequencer oracle is configured)
+        /// The validUntil from the token price oracle
+        /// The validUntil from the native asset price oracle
+
+        (uint256 tokenPrice, uint256 tokenValidUntil) = fetchPrice(config.tokenOracle, config.maxOracleRoundAge);
+        (uint256 nativePrice, uint256 nativeValidUntil) =
+            fetchPrice(nativeAssetToUsdOracle, nativeOracleConfig.maxOracleRoundAge);
+
+        // Take the minimum of the validUntil timestamps
+        if (validUntil == 0 || tokenValidUntil < validUntil) {
+            validUntil = tokenValidUntil;
+        }
+        if (nativeValidUntil < validUntil) {
+            validUntil = nativeValidUntil;
+        }
+
+        /* effective validUntil will be the minimum of:
+        * 1. Sequencer uptime grace period (if sequencer oracle is configured)
+        * 2. Token price oracle's valid until timestamp
+        * 3. Native asset price oracle's valid until timestamp
+        */
 
         if (tokenOracleDecimals > nativeAssetToUsdOracleDecimals) {
             nativePrice *= 10 ** (tokenOracleDecimals - nativeAssetToUsdOracleDecimals);
@@ -169,21 +196,24 @@ abstract contract PriceOracleHelper {
     // Internal view functions
     /**
      * @notice Fetches the latest price from the given Oracle
-     * @dev Validates price and freshness of the oracle data
+     * @dev Returns price and validUntil timestamp
      * @param _oracle The Oracle contract to fetch the price from
      * @param _maxOracleRoundAge The maximum acceptable age of the price oracle round
      * @return price The latest price fetched from the Oracle
+     * @return validUntil The timestamp until which this price is valid
      */
-    function fetchPrice(IOracle _oracle, uint48 _maxOracleRoundAge) internal view returns (uint256 price) {
+    function fetchPrice(IOracle _oracle, uint48 _maxOracleRoundAge)
+        internal
+        view
+        returns (uint256 price, uint256 validUntil)
+    {
         (, int256 answer,, uint256 updatedAt,) = _oracle.latestRoundData();
 
         if (answer <= 0) {
             revert PriceShouldBePositive();
         }
-        if (updatedAt < block.timestamp - _maxOracleRoundAge) {
-            revert StalePrice();
-        }
 
+        validUntil = updatedAt + _maxOracleRoundAge;
         price = uint256(answer);
     }
 
