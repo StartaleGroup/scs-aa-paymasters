@@ -18,8 +18,7 @@ abstract contract PriceOracleHelper {
     error OracleDecimalsMismatch();
     error SequencerDown();
 
-    // Review: If it should be configurable
-    // Need methods to updated sequencer feed and it's config
+    // We could add methods to updated sequencer feed and it's config if grace period is made configurable
     uint256 private constant GRACE_PERIOD_TIME = 3600;
     uint48 private constant MAX_ALLOWED_ROUND_AGE = 172800; // 48 hours
 
@@ -102,7 +101,8 @@ abstract contract PriceOracleHelper {
                 ,
                 int256 answer,
                 uint256 startedAt,
-                uint256 updatedAt,
+                /*uint256 updatedAt*/
+                ,
                 /*uint80 answeredInRound*/
             ) = sequencerUptimeOracle.latestRoundData();
 
@@ -113,18 +113,11 @@ abstract contract PriceOracleHelper {
                 revert SequencerDown();
             }
 
-            // Todo: Cleanup comments and review notes once review is finalised
-            // Calculate the validUntil timestamp based on the grace period
-            // Review: If it should be startedAt or updatedAt?
-            // validUntil = updatedAt + GRACE_PERIOD_TIME;
-
-            // otherwise validAfter works
+            // should be the sequencer start time + grace period
             validAfter = startedAt + GRACE_PERIOD_TIME;
         }
 
-        /// taking the minimum of three timestamps
-        ///
-        /// The validUntil from the sequencer uptime check (if sequencer oracle is configured)
+        /// taking the minimum of two timestamps
         /// The validUntil from the token price oracle
         /// The validUntil from the native asset price oracle
 
@@ -132,18 +125,17 @@ abstract contract PriceOracleHelper {
         (uint256 nativePrice, uint256 nativeValidUntil) =
             fetchPrice(nativeAssetToUsdOracle, nativeOracleConfig.maxOracleRoundAge);
 
-        // Take the minimum of the validUntil timestamps
-        if (validUntil == 0 || tokenValidUntil < validUntil) {
+        if (tokenValidUntil < nativeValidUntil && tokenValidUntil != 0) {
             validUntil = tokenValidUntil;
-        }
-        if (nativeValidUntil < validUntil) {
+        } else if (nativeValidUntil != 0) {
             validUntil = nativeValidUntil;
+        } else {
+            validUntil = 1; // Invalidates the userOp when Oracles are misconfigured
         }
 
         /* effective validUntil will be the minimum of:
-        * 1. Sequencer uptime grace period (if sequencer oracle is configured)
-        * 2. Token price oracle's valid until timestamp
-        * 3. Native asset price oracle's valid until timestamp
+        * 1. Token price oracle's valid until timestamp
+        * 2. Native asset price oracle's valid until timestamp
         */
 
         if (tokenOracleDecimals > nativeAssetToUsdOracleDecimals) {

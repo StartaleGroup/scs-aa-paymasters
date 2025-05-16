@@ -556,7 +556,9 @@ contract StartaleTokenPaymaster is
             bytes memory context = abi.encode(
                 _userOp.sender, tokenAddress, preOpGasApproximation, executionGasLimit, effectiveExchangeRate, feeMarkup
             );
-            uint256 validationData = _packValidationData(false, uint48(effectiveExchangeRateValidUntil), 0);
+            uint256 validationData = _packValidationData(
+                false, uint48(effectiveExchangeRateValidUntil), uint48(effectiveExchangeRateValidAfter)
+            );
             return (context, validationData);
         } else if (mode == PaymasterMode.EXTERNAL) {
             (
