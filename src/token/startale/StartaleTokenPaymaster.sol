@@ -533,7 +533,11 @@ contract StartaleTokenPaymaster is
                     + FEE_MARKUP_DENOMINATOR - 1
             ) / FEE_MARKUP_DENOMINATOR;
 
-            uint256 effectiveExchangeRate = getExchangeRate(tokenAddress);
+            (
+                uint256 effectiveExchangeRate,
+                uint256 effectiveExchangeRateValidUntil,
+                uint256 effectiveExchangeRateValidAfter
+            ) = getExchangeRate(tokenAddress);
 
             if (effectiveExchangeRate == 0) {
                 revert TokenPriceFeedErrored(tokenAddress);
@@ -552,7 +556,9 @@ contract StartaleTokenPaymaster is
             bytes memory context = abi.encode(
                 _userOp.sender, tokenAddress, preOpGasApproximation, executionGasLimit, effectiveExchangeRate, feeMarkup
             );
-            uint256 validationData = _packValidationData(false, 0, 0);
+            uint256 validationData = _packValidationData(
+                false, uint48(effectiveExchangeRateValidUntil), uint48(effectiveExchangeRateValidAfter)
+            );
             return (context, validationData);
         } else if (mode == PaymasterMode.EXTERNAL) {
             (

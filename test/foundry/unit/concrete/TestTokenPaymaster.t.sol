@@ -378,7 +378,8 @@ contract TestTokenPaymaster is TestBase {
         gasValue = gasValue - gasleft();
         stopPrank();
 
-        uint256 exchangeRate = tokenPaymaster.getExchangeRate(address(testToken));
+        (uint256 exchangeRate, uint256 exchangeRateValidUntil, uint256 exchangeRateValidAfter) =
+            tokenPaymaster.getExchangeRate(address(testToken));
 
         uint256 gasPaidBySAInERC20 = initialUserTokenBalance - testToken.balanceOf(address(ALICE_ACCOUNT));
 
@@ -455,7 +456,8 @@ contract TestTokenPaymaster is TestBase {
         gasValue = gasValue - gasleft();
         stopPrank();
 
-        uint256 exchangeRate = tokenPaymaster.getExchangeRate(address(testToken));
+        (uint256 exchangeRate, uint256 exchangeRateValidUntil, uint256 exchangeRateValidAfter) =
+            tokenPaymaster.getExchangeRate(address(testToken));
 
         uint256 gasPaidBySAInERC20 = initialUserTokenBalance - testToken.balanceOf(address(ALICE_ACCOUNT));
 
@@ -528,14 +530,7 @@ contract TestTokenPaymaster is TestBase {
         startPrank(BUNDLER.addr);
         uint256 gasValue = gasleft();
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IEntryPoint.FailedOpWithRevert.selector,
-                0,
-                "AA33 reverted",
-                abi.encodeWithSelector(PriceOracleHelper.StalePrice.selector)
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IEntryPoint.FailedOp.selector, 0, "AA32 paymaster expired or not due"));
 
         ENTRYPOINT.handleOps(ops, payable(BUNDLER.addr));
         gasValue = gasValue - gasleft();
