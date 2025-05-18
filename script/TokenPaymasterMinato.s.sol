@@ -20,13 +20,13 @@ contract DeployTokenPaymasterMinato is Script {
         address owner = vm.envAddress("OWNER");
         address feeTreasury = vm.envAddress("TOKEN_FEE_TREASURY");
         uint256 unaccountedGas = vm.envUint("UNACCOUNTED_GAS");
-        address nativeAssetToUsdOracle = vm.envAddress("NATIVE_ASSET_TO_USD_ORACLE");
+        address nativeAssetToUsdOracle = vm.envAddress("NATIVE_ASSET_TO_USD_ORACLE_MINATO");
         uint48 nativeAssetMaxOracleRoundAge = uint48(vm.envUint("NATIVE_ASSET_MAX_ORACLE_ROUND_AGE"));
         uint8 nativeAssetDecimals = 18;
 
         // Let's deploy with one Independent Token and more we can add later
         address astrAddress = vm.envAddress("ASTR_TOKEN_ADDERESS_MINATO");
-        address astrToUsdOracle = vm.envAddress("ASTR_TO_USD_ORACLE");
+        address astrToUsdOracle = vm.envAddress("ASTR_TO_USD_ORACLE_MINATO");
         uint48 feeMarkupForIndependentToken = uint48(vm.envUint("FEE_MARKUP_FOR_INDEPENDENT_TOKEN"));
         uint48 astrMaxOracleRoundAge = uint48(vm.envUint("ASTR_MAX_ORACLE_ROUND_AGE"));
 
