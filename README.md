@@ -93,7 +93,7 @@ src/sponsorship/SponsorshipPaymaster.sol:SponsorshipPaymaster --watch
 
 | Network        | Address                                                                                                                                                                                                                                                      |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Soneium Minato | `0xcE3428634685df52CBc99146593aaB26580D5D10` (salt:`0x90d8084deab30c2a37c45e8d47f49f2f7965183cb6990a98943ef94940681de3`, constructor owner: `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, constructor signers `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, FEE_COLLECTOR `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, MIN_DEPOSIT `1000000000000000`WITHDRAWAL_DELAY `60`, UNACCOUNTED_GAS `11000`) |
+| Soneium Minato | `0x1F34E9253395df78bA8545d54e0a1576010cC025` (salt:`0x90d8084deab30c2a37c45e8d47f49f2f7965183cb6990a98943ef94940681de3`, constructor owner: `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, constructor signers `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, FEE_COLLECTOR `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, MIN_DEPOSIT `1000000000000000`WITHDRAWAL_DELAY `60`, UNACCOUNTED_GAS `11000`) |
 
 **Token Paymaster**
 
@@ -104,11 +104,11 @@ deployed with ASTR token support from beginning (Independent mode)
 #####Initial draft is deployed at below address
 
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Soneium Minato | `0xcEf7da45a09B17D77e33FC32e5D24Ef1D30B68E3..` (salt:`0x90d8084deab30c2a37c45e8d47f49f2f7965183cb6990a98943ef94940681de3`, constructor owner: `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, constructor signers `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, TOKEN_FEE_TREASURY`0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, UNACCOUNTED_GAS `40000`), ASTR_ADDRESS `0x26e6f7c7047252DdE3dcBF26AA492e6a264Db655` | ASTR_USD_FEED_ADDRESS `0x1e13086Ca715865e4d89b280e3BB6371dD48DabA` | ETH_USD_FEED_ADDRESS `0xCA50964d2Cf6366456a607E5e1DBCE381A8BA807` 
+| Soneium Minato | `0xC7d6d41DeDbfB365469FF2FFB2c89c11aC41d4f0..` (salt:`0x90d8084deab30c2a37c45e8d47f49f2f7965183cb6990a98943ef94940681de3`, constructor owner: `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, constructor signers `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, TOKEN_FEE_TREASURY`0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`, UNACCOUNTED_GAS `40000`), ASTR_ADDRESS `0x26e6f7c7047252DdE3dcBF26AA492e6a264Db655` | ASTR_USD_FEED_ADDRESS `0x1e13086Ca715865e4d89b280e3BB6371dD48DabA` | ETH_USD_FEED_ADDRESS `0xCA50964d2Cf6366456a607E5e1DBCE381A8BA807` 
 
 
 **Startale Managed Paymaster**
 
 | Network        | Address                                                                                                                                                                                                                                                      |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Soneium Minato | `0xB4D0fb5A501b2F9DEa751FaF8151Dfa6b48CaEB3` (salt:`0x90d8084deab30c2a37c45e8d47f49f2f7965183cb6990a98943ef94940681de3`, constructor owner: `0x2cf491602ad22944D9047282aBC00D3e52F56B37`, constructor signers `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`) |
+| Soneium Minato | `0x159DD1E396B655B683603CA6eaA7E78708c0f6Af` (salt:`0x90d8084deab30c2a37c45e8d47f49f2f7965183cb6990a98943ef94940681de3`, constructor owner: `0x2cf491602ad22944D9047282aBC00D3e52F56B37`, constructor signers `0xFc035b327d67E3d12f207C6A3fE5d5Ed67ADe5BE`) |
