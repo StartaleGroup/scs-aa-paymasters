@@ -17,7 +17,7 @@ contract TestTokenPaymasterSoneium is TestBase {
     uint256 public constant WITHDRAWAL_DELAY = 3600;
     uint256 public constant MIN_DEPOSIT = 1e15;
     uint256 public constant UNACCOUNTED_GAS = 50e3;
-    uint48 public constant MAX_ORACLE_ROUND_AGE = 1 days;
+    uint48 public constant MAX_ORACLE_ROUND_AGE = 4 hours;
 
     StartaleTokenPaymaster public tokenPaymaster;
     // MockOracle public nativeAssetToUsdOracle;
