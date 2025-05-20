@@ -20,7 +20,7 @@ contract DeploySponsorshipPaymasterCreate3 is Script {
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_CONTRACT_DEPLOYER_PRIVATE_KEY");
 
         string memory contractName = "SponsorshipPaymaster";
-        string memory saltString = "SPONSORSHIP_PAYMASTER_V_1_0_0_SALT_200525_9S16Gek"; // placeholder until salt is final, then get it from env
+        string memory saltString = "SPONSORSHIP_PAYMASTER_V_1_0_0_SALT_200525_9S16Gek"; // todo: get it from env
         // for above salt the address would be 0x00000016a9b189992551854a5efc14e5eef7c46b
 
         // Review

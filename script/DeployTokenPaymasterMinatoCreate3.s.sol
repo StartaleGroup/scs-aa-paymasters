@@ -22,7 +22,7 @@ contract DeployTokenPaymasterMinatoCreate3 is Script {
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_CONTRACT_DEPLOYER_PRIVATE_KEY");
 
         string memory contractName = "StartaleTokenPaymaster";
-        string memory saltString = "TOKEN_PAYMASTER_V_1_0_0_SALT_200525_sHeZQ0e"; // placeholder until salt is final, then get it from env
+        string memory saltString = "TOKEN_PAYMASTER_V_1_0_0_SALT_200525_sHeZQ0e"; // Todo: get it from env
         // for above salt the address would be 0x000000af44af54512581c0c05aecab9bdfc0ba26
 
         // Review

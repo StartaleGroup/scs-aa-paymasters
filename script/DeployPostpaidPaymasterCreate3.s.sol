@@ -20,8 +20,8 @@ contract DeployPostpaidPaymasterCreate3 is Script {
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_CONTRACT_DEPLOYER_PRIVATE_KEY");
 
         string memory contractName = "StartaleManagedPaymaster";
-        string memory saltString = "POSTPAID_SPONSORSHIP_PAYMASTER_V_1_0_0_SALT_200525_Or1tX5I"; // placeholder  until salt is final, then get it from env
-        // for above salt the address would be 0x00001c0124cd204b5048c040235a6b0c19ee6761
+        string memory saltString = "POSTPAID_SPONSORSHIP_PAYMASTER_V_1_0_0_SALT_200525_q6IgGwK"; // todo: get it from env
+        // for above salt the address would be 0x0000007d3cd3002cb096568ba3cc1319c03f2a55
 
         // Review
         bytes memory deployedBytecode =
