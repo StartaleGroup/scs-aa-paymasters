@@ -22,8 +22,8 @@ contract DeployTokenPaymasterSoneiumCreate3 is Script {
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_CONTRACT_DEPLOYER_PRIVATE_KEY");
 
         string memory contractName = "StartaleTokenPaymaster";
-        string memory saltString = "TOKEN_PAYMASTER_V_1_0_0_SALT_120525_cPzqgG8"; // placeholder until salt is final, then get it from env
-        // for above salt the address would be 0x0000d23edaadfcca8e8eefd421b237ee6a24931c
+        string memory saltString = "TOKEN_PAYMASTER_V_1_0_0_SALT_200525_sHeZQ0e"; // placeholder until salt is final, then get it from env
+        // for above salt the address would be 0x000000af44af54512581c0c05aecab9bdfc0ba26
 
         // Todo: Update bytecode 
         bytes memory deployedBytecode =
