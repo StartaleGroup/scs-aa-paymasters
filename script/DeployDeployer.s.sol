@@ -9,6 +9,7 @@ contract DeployDeployer is Script {
 
     function setUp() public {
         DEPLOYMENT_CHAIN_GAS_PRICES[1946] = 0.002 gwei;
+        DEPLOYMENT_CHAIN_GAS_PRICES[1868] = 0.001 gwei;
     }
 
     function run() public {
