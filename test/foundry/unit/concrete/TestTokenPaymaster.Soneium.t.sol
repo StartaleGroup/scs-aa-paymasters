@@ -16,7 +16,7 @@ import {IOracle} from "../../../../src/interfaces/IOracle.sol";
 contract TestTokenPaymasterSoneium is TestBase {
     uint256 public constant WITHDRAWAL_DELAY = 3600;
     uint256 public constant MIN_DEPOSIT = 1e15;
-    uint256 public constant UNACCOUNTED_GAS = 50e3;
+    uint256 public constant TOKEN_PM_UNACCOUNTED_GAS = 50e3;
     uint48 public constant MAX_ORACLE_ROUND_AGE = 4 hours;
 
     StartaleTokenPaymaster public tokenPaymaster;
@@ -48,7 +48,7 @@ contract TestTokenPaymasterSoneium is TestBase {
             _entryPoint: address(ENTRYPOINT),
             _signers: signers,
             _tokenFeesTreasury: PAYMASTER_FEE_COLLECTOR.addr,
-            _unaccountedGas: UNACCOUNTED_GAS,
+            _unaccountedGas: TOKEN_PM_UNACCOUNTED_GAS,
             _nativeAssetToUsdOracle: address(nativeOracle),
             _sequencerUptimeOracle: address(sequencerUptimeOracle),
             _nativeAssetMaxOracleRoundAge: MAX_ORACLE_ROUND_AGE,
@@ -74,7 +74,7 @@ contract TestTokenPaymasterSoneium is TestBase {
             ENTRYPOINT_ADDRESS,
             signers,
             PAYMASTER_FEE_COLLECTOR.addr,
-            UNACCOUNTED_GAS, // unaccounted gas
+            TOKEN_PM_UNACCOUNTED_GAS, // unaccounted gas
             address(nativeOracle),
             address(sequencerUptimeOracle),
             MAX_ORACLE_ROUND_AGE,
@@ -94,7 +94,7 @@ contract TestTokenPaymasterSoneium is TestBase {
         assertEq(testArtifact.isSigner(PAYMASTER_SIGNER_A.addr), true);
         assertEq(testArtifact.isSigner(PAYMASTER_SIGNER_B.addr), true);
         assertEq(address(testArtifact.nativeAssetToUsdOracle()), address(nativeOracle));
-        assertEq(testArtifact.unaccountedGas(), UNACCOUNTED_GAS);
+        assertEq(testArtifact.unaccountedGas(), TOKEN_PM_UNACCOUNTED_GAS);
     }
 
     function test_Deposit_Soneium() external prankModifier(PAYMASTER_OWNER.addr) {

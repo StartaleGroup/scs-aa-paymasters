@@ -14,6 +14,7 @@ contract DeploySponsorshipPaymasterCreate3 is Script {
         // EntryPoint v0.7 address
         entryPoint = vm.parseAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032");
         DEPLOYMENT_CHAIN_GAS_PRICES[1946] = 0.002 gwei;
+        DEPLOYMENT_CHAIN_GAS_PRICES[1868] = 0.001 gwei;
     }
 
     function run() public {
@@ -33,7 +34,7 @@ contract DeploySponsorshipPaymasterCreate3 is Script {
         address feeCollector = vm.envAddress("FEE_COLLECTOR");
         uint256 minDeposit = vm.envUint("MIN_DEPOSIT");
         uint256 withdrawalDelay = vm.envUint("WITHDRAWAL_DELAY");
-        uint256 unaccountedGas = vm.envUint("UNACCOUNTED_GAS");
+        uint256 unaccountedGas = vm.envUint("SPONSERSHIP_PM_UNACCOUNTED_GAS");
 
         // Parse signers from comma-separated string
         string[] memory signers = vm.envString("SIGNERS", ",");

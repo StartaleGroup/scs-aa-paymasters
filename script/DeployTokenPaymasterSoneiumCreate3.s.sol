@@ -16,6 +16,7 @@ contract DeployTokenPaymasterSoneiumCreate3 is Script {
         // EntryPoint v0.7 address
         entryPoint = vm.parseAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032");
         DEPLOYMENT_CHAIN_GAS_PRICES[1946] = 0.002 gwei;
+        DEPLOYMENT_CHAIN_GAS_PRICES[1868] = 0.001 gwei;
     }
 
     function run() public {

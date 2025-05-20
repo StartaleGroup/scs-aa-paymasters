@@ -19,7 +19,7 @@ contract DeployTokenPaymasterMinato is Script {
         uint256 salt = vm.envUint("SALT");
         address owner = vm.envAddress("OWNER");
         address feeTreasury = vm.envAddress("TOKEN_FEE_TREASURY");
-        uint256 unaccountedGas = vm.envUint("UNACCOUNTED_GAS");
+        uint256 unaccountedGas = vm.envUint("TOKEN_PM_UNACCOUNTED_GAS");
         address nativeAssetToUsdOracle = vm.envAddress("NATIVE_ASSET_TO_USD_ORACLE_MINATO");
         uint48 nativeAssetMaxOracleRoundAge = uint48(vm.envUint("NATIVE_ASSET_MAX_ORACLE_ROUND_AGE"));
         uint8 nativeAssetDecimals = 18;

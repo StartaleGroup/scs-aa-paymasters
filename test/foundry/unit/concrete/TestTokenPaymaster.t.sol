@@ -17,7 +17,7 @@ import {PriceOracleHelper} from "../../../../src/token/startale/PriceOracleHelpe
 contract TestTokenPaymaster is TestBase {
     uint256 public constant WITHDRAWAL_DELAY = 3600;
     uint256 public constant MIN_DEPOSIT = 1e15;
-    uint256 public constant UNACCOUNTED_GAS = 50e3;
+    uint256 public constant TOKEN_PM_UNACCOUNTED_GAS = 50e3;
     uint48 public constant MAX_ORACLE_ROUND_AGE = 1000;
 
     StartaleTokenPaymaster public tokenPaymaster;
@@ -45,7 +45,7 @@ contract TestTokenPaymaster is TestBase {
             _entryPoint: address(ENTRYPOINT),
             _signers: signers,
             _tokenFeesTreasury: PAYMASTER_FEE_COLLECTOR.addr,
-            _unaccountedGas: UNACCOUNTED_GAS,
+            _unaccountedGas: TOKEN_PM_UNACCOUNTED_GAS,
             _nativeAssetToUsdOracle: address(nativeAssetToUsdOracle),
             _sequencerUptimeOracle: address(0),
             _nativeAssetMaxOracleRoundAge: MAX_ORACLE_ROUND_AGE,
@@ -68,7 +68,7 @@ contract TestTokenPaymaster is TestBase {
             ENTRYPOINT_ADDRESS,
             signers,
             PAYMASTER_FEE_COLLECTOR.addr,
-            UNACCOUNTED_GAS, // unaccounted gas
+            TOKEN_PM_UNACCOUNTED_GAS, // unaccounted gas
             address(nativeAssetToUsdOracle),
             address(0),
             MAX_ORACLE_ROUND_AGE,
@@ -88,7 +88,7 @@ contract TestTokenPaymaster is TestBase {
         assertEq(testArtifact.isSigner(PAYMASTER_SIGNER_A.addr), true);
         assertEq(testArtifact.isSigner(PAYMASTER_SIGNER_B.addr), true);
         assertEq(address(testArtifact.nativeAssetToUsdOracle()), address(nativeAssetToUsdOracle));
-        assertEq(testArtifact.unaccountedGas(), UNACCOUNTED_GAS);
+        assertEq(testArtifact.unaccountedGas(), TOKEN_PM_UNACCOUNTED_GAS);
     }
 
     function test_Deposit() external prankModifier(PAYMASTER_OWNER.addr) {
@@ -705,7 +705,7 @@ contract TestTokenPaymaster is TestBase {
             ENTRYPOINT_ADDRESS,
             signers,
             PAYMASTER_FEE_COLLECTOR.addr,
-            UNACCOUNTED_GAS, // unaccounted gas
+            TOKEN_PM_UNACCOUNTED_GAS, // unaccounted gas
             address(nativeAssetToUsdOracle),
             address(0),
             MAX_ORACLE_ROUND_AGE,
@@ -735,7 +735,7 @@ contract TestTokenPaymaster is TestBase {
             ENTRYPOINT_ADDRESS,
             signers,
             PAYMASTER_FEE_COLLECTOR.addr,
-            UNACCOUNTED_GAS, // unaccounted gas
+            TOKEN_PM_UNACCOUNTED_GAS, // unaccounted gas
             address(nativeAssetToUsdOracle),
             address(0),
             MAX_ORACLE_ROUND_AGE,
@@ -769,7 +769,7 @@ contract TestTokenPaymaster is TestBase {
             ENTRYPOINT_ADDRESS,
             signers,
             address(0),
-            UNACCOUNTED_GAS, // unaccounted gas
+            TOKEN_PM_UNACCOUNTED_GAS, // unaccounted gas
             address(nativeAssetToUsdOracle),
             address(0),
             MAX_ORACLE_ROUND_AGE,
