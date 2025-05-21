@@ -18,7 +18,7 @@ contract DeployPostpaidPaymasterCreate3 is Script {
     }
 
     function run() public {
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_CONTRACT_DEPLOYER_PRIVATE_KEY");
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY"); // Or funding account private key
 
         string memory contractName = "StartaleManagedPaymaster";
         string memory saltString = vm.envString("POSTPAID_SPONSORSHIP_PAYMASTER_SALT");
