@@ -17,7 +17,7 @@ contract DeployDeployer is Script {
         console.log("DEPLOYMENT_FEE:", DEPLOYMENT_FEE);
 
         // Load values from `.env`
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_CONTRACT_DEPLOYER_PRIVATE_KEY");
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY"); // Or funding account private key
         uint256 fundingPrivateKey = vm.envUint("FUNDING_ACCOUNT_PRIVATE_KEY");
 
         address deployerAddress = vm.addr(deployerPrivateKey);

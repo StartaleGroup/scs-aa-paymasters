@@ -20,7 +20,7 @@ contract DeployTokenPaymasterSoneiumCreate3 is Script {
     }
 
     function run() public {
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_CONTRACT_DEPLOYER_PRIVATE_KEY");
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY"); // or funding account private key
 
         string memory contractName = "StartaleTokenPaymaster";
         string memory saltString = vm.envString("TOKEN_PAYMASTER_SALT");
