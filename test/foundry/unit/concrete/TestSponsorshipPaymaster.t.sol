@@ -16,7 +16,7 @@ contract TestSponsorshipPaymaster is TestBase {
 
     uint256 public constant WITHDRAWAL_DELAY = 3600;
     uint256 public constant MIN_DEPOSIT = 1e15;
-    uint256 public constant UNACCOUNTED_GAS = 50e3;
+    uint256 public constant SPONSERSHIP_PM_UNACCOUNTED_GAS = 50e3;
 
     function setUp() public {
         setupPaymasterTestEnvironment();
@@ -31,7 +31,7 @@ contract TestSponsorshipPaymaster is TestBase {
             _feeCollector: PAYMASTER_FEE_COLLECTOR.addr,
             _minDeposit: MIN_DEPOSIT,
             _withdrawalDelay: WITHDRAWAL_DELAY,
-            _unaccountedGas: UNACCOUNTED_GAS
+            _unaccountedGas: SPONSERSHIP_PM_UNACCOUNTED_GAS
         });
     }
 
@@ -105,7 +105,7 @@ contract TestSponsorshipPaymaster is TestBase {
         assertEq(sponsorshipPaymaster.isSigner(PAYMASTER_SIGNER_A.addr), true);
         assertEq(sponsorshipPaymaster.isSigner(PAYMASTER_SIGNER_B.addr), true);
         assertEq(sponsorshipPaymaster.feeCollector(), PAYMASTER_FEE_COLLECTOR.addr);
-        assertEq(sponsorshipPaymaster.unaccountedGas(), UNACCOUNTED_GAS);
+        assertEq(sponsorshipPaymaster.unaccountedGas(), SPONSERSHIP_PM_UNACCOUNTED_GAS);
     }
 
     function test_Revert_DirectOwnershipTransfer() external prankModifier(PAYMASTER_OWNER.addr) {

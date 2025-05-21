@@ -13,7 +13,7 @@ contract TestFuzz_SponsorshipPaymaster is TestBase {
 
     uint256 public constant WITHDRAWAL_DELAY = 3600;
     uint256 public constant MIN_DEPOSIT = 1e15;
-    uint256 public constant UNACCOUNTED_GAS = 50e3;
+    uint256 public constant SPONSERSHIP_PM_UNACCOUNTED_GAS = 50e3;
 
     function setUp() public {
         setupPaymasterTestEnvironment();
@@ -28,7 +28,7 @@ contract TestFuzz_SponsorshipPaymaster is TestBase {
             _feeCollector: PAYMASTER_FEE_COLLECTOR.addr,
             _minDeposit: MIN_DEPOSIT,
             _withdrawalDelay: WITHDRAWAL_DELAY,
-            _unaccountedGas: UNACCOUNTED_GAS
+            _unaccountedGas: SPONSERSHIP_PM_UNACCOUNTED_GAS
         });
     }
 

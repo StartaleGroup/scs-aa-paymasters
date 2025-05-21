@@ -20,7 +20,7 @@ contract DeploySponsorshipPaymaster is Script {
         address feeCollector = vm.envAddress("FEE_COLLECTOR");
         uint256 minDeposit = vm.envUint("MIN_DEPOSIT");
         uint256 withdrawalDelay = vm.envUint("WITHDRAWAL_DELAY");
-        uint256 unaccountedGas = vm.envUint("UNACCOUNTED_GAS");
+        uint256 unaccountedGas = vm.envUint("SPONSERSHIP_PM_UNACCOUNTED_GAS");
 
         // Parse signers from comma-separated string
         string[] memory signers = vm.envString("SIGNERS", ",");
