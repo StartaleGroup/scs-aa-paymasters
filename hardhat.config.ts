@@ -4,7 +4,7 @@ import "@nomicfoundation/hardhat-foundry";
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.29", // adjust version as needed
+    version: "0.8.30", // adjust version as needed
     settings: {
       optimizer: {
         enabled: true,
