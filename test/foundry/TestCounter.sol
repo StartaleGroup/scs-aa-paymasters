@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.29;
+pragma solidity ^0.8.30;
 
 //sample "receiver" contract, for testing "exec" from account.
 contract TestCounter {

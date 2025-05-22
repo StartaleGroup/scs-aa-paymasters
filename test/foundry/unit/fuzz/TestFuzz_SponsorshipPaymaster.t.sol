@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.29;
+pragma solidity ^0.8.30;
 
 import "../../TestBase.sol";
 import {ISponsorshipPaymaster} from "../../../../src/interfaces/ISponsorshipPaymaster.sol";

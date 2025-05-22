@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.29;
+pragma solidity ^0.8.30;
 
 import {Script, console} from "forge-std/Script.sol";
 import {StartaleManagedPaymaster} from "../src/sponsorship/StartaleManagedPaymaster.sol";
