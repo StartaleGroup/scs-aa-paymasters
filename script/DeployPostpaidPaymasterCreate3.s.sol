@@ -13,6 +13,7 @@ contract DeployPostpaidPaymasterCreate3 is Script {
         deployerInstance = Deployer(vm.envAddress("DEPLOYER_CONTRACT_ADDRESS")); // Set Deployer contract
         // EntryPoint v0.7 address
         entryPoint = vm.parseAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032");
+        DEPLOYMENT_CHAIN_GAS_PRICES[10] = 0.001 gwei;
         DEPLOYMENT_CHAIN_GAS_PRICES[1946] = 0.002 gwei;
         DEPLOYMENT_CHAIN_GAS_PRICES[1868] = 0.001 gwei;
         DEPLOYMENT_CHAIN_GAS_PRICES[11155420] = 0.002 gwei;
